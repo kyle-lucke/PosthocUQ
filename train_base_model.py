@@ -229,11 +229,10 @@ def adjust_learning_rate(optimizer, epoch):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-
-if not os.path.exists(logname):
-    with open(logname, 'w') as logfile:
-        logwriter = csv.writer(logfile, delimiter=',')
-        logwriter.writerow(['epoch', 'train loss', 'reg loss', 'train acc', 'test loss', 'test acc'])
+        
+with open(logname, 'w') as logfile:
+    logwriter = csv.writer(logfile, delimiter=',')
+    logwriter.writerow(['epoch', 'train loss', 'reg loss', 'train acc', 'test loss', 'test acc'])
 
 for epoch in range(start_epoch, args.epoch):
     train_loss, reg_loss, train_acc = train(epoch)
