@@ -1,5 +1,5 @@
 # Post-hoc Uncertainty Learning using a Dirichlet Meta-Model
-This repository contains official implementation of AAAI 2023 paper [Post-hoc Uncertainty Learning using a Dirichlet Meta-Model](https://arxiv.org/abs/2212.07359).
+This repository is a fork of the official implementation of AAAI 2023 paper [Post-hoc Uncertainty Learning using a Dirichlet Meta-Model](https://arxiv.org/abs/2212.07359).
 
 ## Requirements
 - python == 3.8.8
