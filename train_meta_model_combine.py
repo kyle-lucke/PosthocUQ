@@ -31,7 +31,7 @@ parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type
                     help='model type (default: LeNet)')
 parser.add_argument('--name', default='CIFAR100_OOD', type=str, help='name of run')
 parser.add_argument('--dataset', default='CIFAR100', type=str, help='name of run')
-parser.add_argument('--seed_trail', default=1, type=int, help='random seed')
+parser.add_argument('--seed', default=1, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
 parser.add_argument('--no-augment', dest='augment', action='store_false',
@@ -53,16 +53,16 @@ else:
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
 
 if use_cuda:
-    torch.manual_seed(args.seed_trail)
-    torch.cuda.manual_seed_all(args.seed_trail)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed_trail)
-    random.seed(args.seed_trail)
-    os.environ['PYTHONHASHSEED'] = str(args.seed_trail)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
 print('==> Resuming from checkpoint..')
 assert os.path.isdir('./checkpoint'), 'Error: no checkpoint directory found!'
-checkpoint = torch.load('./checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed_trail) + '_' + str(args.base_epoch),
+checkpoint = torch.load('./checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed) + '_' + str(args.base_epoch),
                         map_location=torch.device('cpu') if not use_cuda else None)
 
 '''
@@ -109,7 +109,7 @@ if args.dataset == 'CIFAR10':
     dataset_val = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_test)
     dataset_noise = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_noise)
     num_total_data = int(len(dataset))
-    random.seed(args.seed_trail)
+    random.seed(args.seed)
     data_list = list(range(num_total_data))
     random.shuffle(data_list)
     train_list = data_list[:40000]
@@ -149,7 +149,7 @@ elif args.dataset == 'CIFAR100':
     dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
     dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
     num_total_data = int(len(dataset))
-    random.seed(args.seed_trail)
+    random.seed(args.seed)
     data_list = list(range(num_total_data))
     random.shuffle(data_list)
     train_list = data_list[:40000]
@@ -191,7 +191,7 @@ elif args.dataset == 'MNIST':
     dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
     dataset_noise = datasets.MNIST(root='~/data/MNIST', train=True, download=False, transform=transform_noise)
     num_total_data = int(len(dataset))
-    random.seed(args.seed_trail)
+    random.seed(args.seed)
     data_list = list(range(num_total_data))
     random.shuffle(data_list)
     train_list = data_list[:50000]
@@ -241,7 +241,7 @@ optimizer = optim.SGD(meta_net.parameters(), momentum=0.9, weight_decay=args.dec
 
 if not os.path.isdir('results'):
     os.mkdir('results')
-logname = ('results/log_' + meta_net.__class__.__name__ + '_' + args.name + '_' + str(args.seed_trail) + '.csv')
+logname = ('results/log_' + meta_net.__class__.__name__ + '_' + args.name + '_' + str(args.seed) + '.csv')
 
 '''
 Training Meta-model
@@ -444,7 +444,7 @@ def checkpoint(auroc, epoch):
     }
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    torch.save(state, './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed_trail))
+    torch.save(state, './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed))
 
 
 def adjust_learning_rate(optimizer, epoch):

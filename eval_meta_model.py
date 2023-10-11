@@ -28,7 +28,7 @@ parser.add_argument('--meta_model', default="VGG16_MetaModel_combine", type=str,
 parser.add_argument('--fea_dim', default=[16384, 8192, 4096, 2048, 512])
 parser.add_argument('--name', default='CIFAR10_OOD', type=str, help='name of run')
 parser.add_argument('--dataset', default='CIFAR10', type=str, help='name of run')
-parser.add_argument('--seed_trail', default=0, type=int, help='random seed')
+parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
 parser.add_argument('--no-augment', dest='augment', action='store_false',
@@ -46,13 +46,13 @@ else:
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
 
 if use_cuda:
-    torch.manual_seed(args.seed_trail)
-    torch.cuda.manual_seed_all(args.seed_trail)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed_trail)
-    random.seed(args.seed_trail)
-    os.environ['PYTHONHASHSEED'] = str(args.seed_trail)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
 
 '''
 Processing data
@@ -136,21 +136,24 @@ elif args.dataset == 'MNIST':
     oodloaders.append(loaders.CIFAR10(transform_ood_normal, batch_size=100, shuffle=False, num_workers=8))
     oodloaders.append(loaders.Corrupted(args.dataset, transform_noise, batch_size=100, shuffle=False, num_workers=8))
 
-print('current seeds', args.seed_trail)
+print('current seeds', args.seed)
 if use_cuda:
-    torch.manual_seed(args.seed_trail)
-    torch.cuda.manual_seed_all(args.seed_trail)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed_trail)
-    random.seed(args.seed_trail)
-    os.environ['PYTHONHASHSEED'] = str(args.seed_trail)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
+    
 print('==> Resuming from checkpoint..')
 assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
+
+# Load base model and meta model
 checkpoint_base = torch.load(
-    './checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed_trail) + '_' + str(args.base_epoch))
+    './checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed) + '_' + str(args.base_epoch))
 checkpoint_meta = torch.load(
-    './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed_trail))
+    './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed))
 
 if use_cuda:
     if args.dataset == 'CIFAR100':
