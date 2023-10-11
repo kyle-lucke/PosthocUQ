@@ -1,8 +1,9 @@
 from __future__ import print_function
 
-import argparse
 import os
+import csv
 import random
+import argparse
 
 import numpy as np
 import torch
@@ -254,6 +255,10 @@ if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
                   base_preds, meta_preds)
 
 elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
+    out_dir = os.path.join('results', f'eval_{args.name}_{args.meta_model}_{args.seed}')
+    if not os.path.exists(out_dir):
+      os.mkdir(out_dir)
+    
     for i in range(len(oodloaders)):
         print(oodnames[i])
         ood_diff_ents, ood_mis, ood_ents, ood_maxps, ood_precs, ood_labels, \
@@ -270,5 +275,39 @@ elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
         all_base_maxps = torch.cat([base_maxps, ood_base_maxps])
 
         # Evaluate OOD detection performance
-        ROC_OOD(all_diff_ents, all_mis, all_ents, all_maxps, all_precs,
-                all_labels, all_base_ents, all_base_maxps)
+        res = ROC_OOD(all_diff_ents, all_mis, all_ents, all_maxps, all_precs, all_labels,
+                      all_base_ents, all_base_maxps)
+        
+        auroc_ent = res[0][0]
+        auroc_maxp = res[0][1]
+        auroc_mi = res[0][2]
+        auroc_dent = res[0][3]
+        auroc_prec = res[0][4]
+
+        aupr_ent = res[1][0]
+        aupr_maxp = res[1][1]
+        aupr_mi = res[1][2]
+        aupr_dent = res[1][3]
+        aupr_prec = res[1][4]
+
+        auroc_base_ent = res[2][0]
+        auroc_base_maxp = res[2][1]
+
+        aupr_base_ent = res[2][2]
+        aupr_base_maxp = res[2][3]
+
+        # save out results:
+        log_name = os.path.join(out_dir, f'{oodnames[i]}.csv')
+
+        with open(log_name, 'w') as logfile:
+            logwriter = csv.writer(logfile, delimiter=',')
+            logwriter.writerow(['AUROC ENT', 'AUROC MAXP', 'AUROC MI', 'AUROC DENT',
+                                'AUROC PREC', 'AUPR ENT', 'AUPR MAXP', 'AUPR MI', 'AUPR DENT',
+                                'AUPR PREC', 'AUROC BASE ENT', 'AUROC BASE MAXP',
+                                'AUPR BASE ENT', 'AUPR BASE MAXP'])
+
+            
+            
+            logwriter.writerow([auroc_ent, auroc_maxp, auroc_mi, auroc_dent, auroc_prec,
+                                aupr_ent, aupr_maxp, aupr_mi, aupr_dent, aupr_prec,
+                                auroc_base_ent, auroc_base_maxp, aupr_base_ent, aupr_base_maxp])
