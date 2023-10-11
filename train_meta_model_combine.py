@@ -474,7 +474,5 @@ if __name__ == '__main__':
     training_time = time.perf_counter() - time_start
     print('Total training time', training_time)
 
-    if not args.early_stop:
-        checkpoint(0, args.epoch)
     if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
         checkpoint(0, args.epoch)
