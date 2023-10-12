@@ -26,6 +26,7 @@ parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=100, type=int, help='total epochs to run')
 parser.add_argument('--no-augment', dest='augment', action='store_false', help='use standard augmentation (default: True)')
 parser.add_argument('--decay', default=1e-4, type=float, help='weight decay')
+parser.add_argument('--verbose', action='store_true', help='Weather or not to use progress bar during model training (default: False).')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -171,8 +172,13 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
-        progress_bar(batch_idx, len(trainloader),'Loss: %.3f | Reg: %.5f | Acc: %.3f%% (%d/%d)'% (train_loss/(batch_idx+1), reg_loss/(batch_idx+1), 100.*correct/total, correct, total))
-    return (train_loss/batch_idx, reg_loss/batch_idx, 100.*correct/total)
+        if args.verbose:
+            progress_bar(batch_idx, len(trainloader),'Loss: %.3f | Acc: %.3f%% (%d/%d)'% (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+
+    if not args.verbose:
+        print('Loss: %.3f | Acc: %.3f%% (%d/%d)'% (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+
+    return (train_loss/batch_idx, 100.*correct/total)
 
 '''
 Testing model
@@ -195,12 +201,18 @@ def test(epoch):
             total += targets.size(0)
             correct += predicted.eq(targets.data).cpu().sum()
 
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+            if args.verbose:
+                progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                
+    if not args.verbose:
+        print('Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+
     acc = 100.*correct/total
     if epoch == start_epoch + args.epoch - 1 or acc > best_acc:
         checkpoint(acc, epoch)
     if acc > best_acc:
         best_acc = acc
+
     return (test_loss/batch_idx, 100.*correct/total)
 
 

@@ -38,6 +38,7 @@ parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='use standard augmentation (default: True)')
 parser.add_argument('--decay', default=5e-4, type=float, help='weight decay')
 parser.add_argument('--lambda_KL', default=1e-3, type=float, help='lambda for KL term in ELBO loss')
+parser.add_argument('--verbose', action='store_true', help='Weather or not to use progress bar during model training (default: False).')
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -277,11 +278,16 @@ def train(epoch):
         _, predicted = torch.max(logits.data, 1)
         correct += predicted.eq(ys).cpu().sum()
 
-        progress_bar(current=batch_idx,
-                     total=len(trainloader),
-                     msg='Loss: %.3f |  Acc: %.3f%% (%d/%d)' % (
-                         train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+        if args.verbose:
+            progress_bar(current=batch_idx,
+                         total=len(trainloader),
+                         msg='Loss: %.3f |  Acc: %.3f%% (%d/%d)' % (
+                             train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
+    if not args.verbose:
+      print('Loss: %.3f |  Acc: %.3f%% (%d/%d)' % (
+                             train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+          
     train_loss_final = train_loss / batch_idx
     acc = 100. * correct / total
 
@@ -325,13 +331,19 @@ def test(epoch):
             diff_entropy += compute_differential_entropy(logits).sum()
             precision += compute_precision(logits).sum()
 
-            progress_bar(batch_idx, len(testloader),
-                         'Loss: %.3f | Acc: %.3f%% (%d/%d) | '
-                         'DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                         (test_loss / (batch_idx + 1), 100. * correct / total, correct, total,
-                          diff_entropy / total, mutual_info / total,
-                          total_entropy / total, max_prob / total, precision / total))
+            if args.verbose:
+                progress_bar(batch_idx, len(testloader),
+                             'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                             (test_loss / (batch_idx + 1), 100. * correct / total, correct, total,
+                              diff_entropy / total, mutual_info / total,
+                              total_entropy / total, max_prob / total, precision / total))
 
+        if not args.verbose:
+            print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                             (test_loss / (batch_idx + 1), 100. * correct / total, correct, total,
+                              diff_entropy / total, mutual_info / total,
+                              total_entropy / total, max_prob / total, precision / total))
+                
         test_loss_final = test_loss / total
         acc = 100. * correct / total
 
@@ -420,13 +432,19 @@ def OOD(epoch):
             mutual_info += compute_mutual_information(logits).sum()
             diff_entropy += compute_differential_entropy(logits).sum()
             precision += compute_precision(logits).sum()
-            progress_bar(batch_idx, len(valloader_noise),
-                         'DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f'
-                         % (diff_entropy / total, mutual_info / total,
-                            total_entropy / total, max_prob / total, precision / total))
-    return
 
+            if args.verbose:
+                progress_bar(batch_idx, len(valloader_noise),
+                             'DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f'
+                             % (diff_entropy / total, mutual_info / total,
+                                total_entropy / total, max_prob / total, precision / total))
 
+        if not args.verbose:
+            print('DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f'
+                             % (diff_entropy / total, mutual_info / total,
+                                total_entropy / total, max_prob / total, precision / total))
+
+            
 def checkpoint(auroc, epoch):
     # Save checkpoint.
     print('Saving..')
