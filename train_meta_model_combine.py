@@ -52,15 +52,9 @@ if args.dataset == 'MNIST':
 else:
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
 
-if use_cuda:
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-    os.environ['PYTHONHASHSEED'] = str(args.seed)
-print('==> Resuming from checkpoint..')
+set_seed(args.seed, use_cuda)
+
+print('==> Loading base model checkpoint..')
 assert os.path.isdir('./checkpoint'), 'Error: no checkpoint directory found!'
 checkpoint = torch.load('./checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed) + '_' + str(args.base_epoch),
                         map_location=torch.device('cpu') if not use_cuda else None)

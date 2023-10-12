@@ -1,15 +1,28 @@
 import os
 import sys
 import time
+import random
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import torch.backends.cudnn as cudnn
+
 from sklearn import metrics
 from torch.distributions import MultivariateNormal, Normal
 from torch.distributions.distribution import Distribution
 
+def set_seed(seed, use_cuda):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    if use_cuda:
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 def get_mean_and_std(dataset):
     '''Compute the mean and std value of dataset.'''
@@ -42,8 +55,6 @@ def init_params(net):
                 init.constant(m.bias, 0)
 
 
-# _, term_width = os.popen('stty size', 'r').read().split()
-# term_width = int(term_width)
 term_width = 12
 
 TOTAL_BAR_LENGTH = 36.

@@ -13,7 +13,7 @@ import torch.utils.data as data
 import random
 
 import models
-from utils import progress_bar
+from utils import progress_bar, set_seed
 
 parser = argparse.ArgumentParser(description='Base model training')
 parser.add_argument('--lr', default=1e-1, type=float, help='learning rate')
@@ -33,8 +33,7 @@ use_cuda = torch.cuda.is_available()
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-if args.seed != 0:
-    torch.manual_seed(args.seed)
+set_seed(args.seed, use_cuda)
 
 '''
 Processing data

@@ -15,9 +15,9 @@ import torchvision.transforms as transforms
 import dataloaders as loaders
 import models
 import preproc as pre
-from metrics import compute_total_entropy, compute_max_prob, compute_differential_entropy, compute_mutual_information, \
-    compute_precision
-from utils import ROC_OOD, ROC_Selective, convert_to_rgb
+from metrics import compute_total_entropy, compute_max_prob, compute_differential_entropy, compute_mutual_information, compute_precision
+
+from utils import ROC_OOD, ROC_Selective, convert_to_rgb, set_seed
 
 parser = argparse.ArgumentParser(description='Meta model Evaluation')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
@@ -40,20 +40,13 @@ args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
-
 if args.dataset == 'MNIST':
     args.fea_dim = [6 * 14 * 14, 5 * 5 * 16]
 else:
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
 
-if use_cuda:
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-    os.environ['PYTHONHASHSEED'] = str(args.seed)
+set_seed(args.seed, use_cuda)
+
 
 '''
 Processing data
@@ -138,16 +131,10 @@ elif args.dataset == 'MNIST':
     oodloaders.append(loaders.Corrupted(args.dataset, transform_noise, batch_size=100, shuffle=False, num_workers=8))
 
 print('current seeds', args.seed)
-if use_cuda:
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-    os.environ['PYTHONHASHSEED'] = str(args.seed)
+
+set_seed(args.seed, use_cuda)
     
-print('==> Resuming from checkpoint..')
+print('==> Loading base model and meta model from checkpoint..')
 assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
 
 # Load base model and meta model
