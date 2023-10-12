@@ -143,25 +143,30 @@ checkpoint_base = torch.load(
 checkpoint_meta = torch.load(
     './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed))
 
-if use_cuda:
-    if args.dataset == 'CIFAR100':
-        base_net = models.__dict__[args.base_model](16, 4, 100, 3).cuda()
-    else:
-        base_net = models.__dict__[args.base_model]().cuda()
-    print(torch.cuda.device_count())
-    cudnn.benchmark = True
-    print('Using CUDA..')
-    base_net.load_state_dict(checkpoint_base['net'])
-    base_net.eval()
-    if args.dataset == 'CIFAR10' or args.dataset == 'CIFAR100':
-        meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
-                                                    fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
-                                                    fea_dim5=args.fea_dim[4]).cuda()
-    else:
-        meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1]).cuda()
-    meta_net.load_state_dict(checkpoint_meta['meta_net'])
-    meta_net.eval()
+# if use_cuda:
+if args.dataset == 'CIFAR100':
+    base_net = models.__dict__[args.base_model](16, 4, 100, 3)
+else:
+    base_net = models.__dict__[args.base_model]()
 
+cudnn.benchmark = True
+
+base_net.load_state_dict(checkpoint_base['net'])
+base_net.eval()
+
+if args.dataset == 'CIFAR10' or args.dataset == 'CIFAR100':
+    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
+                                                fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
+                                                fea_dim5=args.fea_dim[4])
+else:
+    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
+
+if use_cuda:
+    base_net = base_net.cuda()
+    meta_net = meta_net.cuda()
+
+meta_net.load_state_dict(checkpoint_meta['meta_net'])
+meta_net.eval()
 
 # Collect all uncertainty scores
 def get_uncertainty_score(loader, label, get_preds=False):
