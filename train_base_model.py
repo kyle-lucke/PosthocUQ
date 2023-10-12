@@ -155,7 +155,6 @@ def train(epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
-    reg_loss = 0
     correct = 0
     total = 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
@@ -243,13 +242,13 @@ def adjust_learning_rate(optimizer, epoch):
         
 with open(logname, 'w') as logfile:
     logwriter = csv.writer(logfile, delimiter=',')
-    logwriter.writerow(['epoch', 'train loss', 'reg loss', 'train acc', 'test loss', 'test acc'])
+    logwriter.writerow(['epoch', 'train loss', 'train acc', 'test loss', 'test acc'])
 
 for epoch in range(start_epoch, args.epoch):
-    train_loss, reg_loss, train_acc = train(epoch)
+    train_loss, train_acc = train(epoch)
     test_loss, test_acc = test(epoch)
     adjust_learning_rate(optimizer, epoch)
     with open(logname, 'a') as logfile:
         logwriter = csv.writer(logfile, delimiter=',')
-        logwriter.writerow([epoch, train_loss, reg_loss, train_acc, test_loss, test_acc])
+        logwriter.writerow([epoch, train_loss, train_acc, test_loss, test_acc])
 
