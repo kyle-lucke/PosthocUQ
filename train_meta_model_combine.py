@@ -19,12 +19,11 @@ import preproc as pre
 from losses import BeliefMatchingLoss
 from metrics import compute_total_entropy, compute_max_prob, compute_differential_entropy, compute_mutual_information, \
     compute_precision
-from utils import progress_bar, convert_to_rgb
+from utils import progress_bar, convert_to_rgb, set_seed
 
 parser = argparse.ArgumentParser(description='Meta model training')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
 parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
 parser.add_argument('--base_model', default="WideResNet_BaseModel", type=str, help='model type (default: LeNet)')
 parser.add_argument('--base_epoch', default=200, type=int, help='total epochs to train base model')
 parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type=str,
@@ -49,7 +48,7 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 best_auroc = 0
 
 if args.dataset == 'MNIST':
-    args.fea_dim = [6 * 14 * 14, 5 * 5 * 16]
+    args.fea_dim = [6*14*14, 5*5*16]
 else:
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
 
@@ -57,7 +56,7 @@ set_seed(args.seed, use_cuda)
 
 print('==> Loading base model checkpoint..')
 assert os.path.isdir('./checkpoint'), 'Error: no checkpoint directory found!'
-checkpoint = torch.load('./checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed) + '_' + str(args.base_epoch),
+checkpoint = torch.load(f'./checkpoint/ckpt.t7{args.dataset}_{args.seed}_{args.base_epoch}',
                         map_location=torch.device('cpu') if not use_cuda else None)
 
 '''
@@ -166,21 +165,21 @@ elif args.dataset == 'MNIST':
             transforms.Resize(32),
             transforms.Lambda(convert_to_rgb),
             transforms.ToTensor(),
-            transforms.Normalize((1 / 2, 1 / 2, 1 / 2), (1 / 2, 1 / 2, 1 / 2))
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
     else:
         transform_train = transforms.Compose([
             transforms.Resize(32),
             transforms.Lambda(convert_to_rgb),
             transforms.ToTensor(),
-            transforms.Normalize((1 / 2, 1 / 2, 1 / 2), (1 / 2, 1 / 2, 1 / 2))
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
     transform_test = transforms.Compose([
         transforms.Resize(32),
         transforms.Lambda(convert_to_rgb),
         transforms.ToTensor(),
-        transforms.Normalize((1 / 2, 1 / 2, 1 / 2), (1 / 2, 1 / 2, 1 / 2))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     dataset = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_train)
     dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
@@ -218,11 +217,12 @@ if args.dataset in ['CIFAR10', 'CIFAR100']:
 else:
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
 if use_cuda:
+    base_net = base_net.cuda()
+    meta_net = meta_net.cuda()
+
     print('Using CUDA..')
     print(torch.cuda.device_count())
     cudnn.benchmark = True
-    base_net = base_net.cuda()
-    meta_net = meta_net.cuda()
 
 base_net.load_state_dict(checkpoint['net'])
 base_net.eval()
@@ -236,7 +236,8 @@ optimizer = optim.SGD(meta_net.parameters(), momentum=0.9, weight_decay=args.dec
 
 if not os.path.isdir('results'):
     os.mkdir('results')
-logname = ('results/log_' + meta_net.__class__.__name__ + '_' + args.name + '_' + str(args.seed) + '.csv')
+
+logname = f'results/log_{meta_net.__class__.__name__}_{args.name}_{args.seed}.csv'
 
 '''
 Training Meta-model
@@ -264,6 +265,7 @@ def train(epoch):
     total = 0
     for batch_idx, (xs, ys) in enumerate(trainloader):
         total += ys.size(0)
+
         if use_cuda:
             xs, ys = xs.cuda(), ys.cuda()
 
@@ -277,19 +279,18 @@ def train(epoch):
        
         _, predicted = torch.max(logits.data, 1)
         correct += predicted.eq(ys).cpu().sum()
-
+ 
         if args.verbose:
-            progress_bar(current=batch_idx,
-                         total=len(trainloader),
-                         msg='Loss: %.3f |  Acc: %.3f%% (%d/%d)' % (
-                             train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+            progress_bar(current=batch_idx, total=len(trainloader),
+                         msg='Loss: %.3f |  Acc: %.3f%% (%d/%d)' %
+                         (train_loss/(batch_idx + 1), 100*correct/total, correct, total))
 
     if not args.verbose:
-      print('Loss: %.3f |  Acc: %.3f%% (%d/%d)' % (
-                             train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
-          
-    train_loss_final = train_loss / batch_idx
-    acc = 100. * correct / total
+      print('Loss: %.3f |  Acc: %.3f%% (%d/%d)' %
+            (train_loss/(batch_idx + 1), 100*correct/total, correct, total))
+
+    train_loss_final = train_loss/batch_idx
+    acc = 100*correct/total
 
     return (train_loss_final, acc)
 
@@ -334,18 +335,18 @@ def test(epoch):
             if args.verbose:
                 progress_bar(batch_idx, len(testloader),
                              'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                             (test_loss / (batch_idx + 1), 100. * correct / total, correct, total,
-                              diff_entropy / total, mutual_info / total,
-                              total_entropy / total, max_prob / total, precision / total))
+                             (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
+                              diff_entropy/total, mutual_info / total,
+                              total_entropy/total, max_prob/total, precision/total))
 
         if not args.verbose:
             print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                             (test_loss / (batch_idx + 1), 100. * correct / total, correct, total,
-                              diff_entropy / total, mutual_info / total,
-                              total_entropy / total, max_prob / total, precision / total))
-                
-        test_loss_final = test_loss / total
-        acc = 100. * correct / total
+                  (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
+                   diff_entropy/total, mutual_info/total,total_entropy/total,
+                   max_prob/total, precision/total))
+            
+        test_loss_final = test_loss/total
+        acc = 100*correct/total
 
         return (test_loss_final, acc)
 
@@ -400,7 +401,6 @@ def UQ_validation():
 
     return
 
-
 '''
 Inference the meta-model on OOD dataset (noisy images)
 '''
@@ -435,14 +435,14 @@ def OOD(epoch):
 
             if args.verbose:
                 progress_bar(batch_idx, len(valloader_noise),
-                             'DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f'
-                             % (diff_entropy / total, mutual_info / total,
-                                total_entropy / total, max_prob / total, precision / total))
+                             'DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                             (diff_entropy/total, mutual_info/total,total_entropy/total,
+                              max_prob/total, precision/total))
 
         if not args.verbose:
-            print('DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f'
-                             % (diff_entropy / total, mutual_info / total,
-                                total_entropy / total, max_prob / total, precision / total))
+            print('DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                  (diff_entropy/total, mutual_info/total, total_entropy/total,
+                   max_prob/total, precision/total))
 
             
 def checkpoint(auroc, epoch):
@@ -456,11 +456,11 @@ def checkpoint(auroc, epoch):
     }
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    torch.save(state, './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed))
+    torch.save(state, f'./checkpoint/ckpt.t7{args.name}_{args.meta_model}_{args.seed}')
 
 
 def adjust_learning_rate(optimizer, epoch):
-    """decrease the learning rate at 100 and 150 epoch"""
+    """decrease the learning rate"""
     lr = args.lr
     lr /= 10
     if epoch >= 20:
@@ -484,7 +484,7 @@ if __name__ == '__main__':
 
     print('Finished')
     training_time = time.perf_counter() - time_start
-    print('Total training time', training_time)
+    print('Total training time', training_time + "s")
 
     if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
         checkpoint(0, args.epoch)

@@ -138,18 +138,14 @@ print('==> Loading base model and meta model from checkpoint..')
 assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
 
 # Load base model and meta model
-checkpoint_base = torch.load(
-    './checkpoint/ckpt.t7' + args.dataset + '_' + str(args.seed) + '_' + str(args.base_epoch))
-checkpoint_meta = torch.load(
-    './checkpoint/ckpt.t7' + args.name + '_' + args.meta_model + '_' + str(args.seed))
+checkpoint_base = torch.load(f'./checkpoint/ckpt.t7{args.dataset}_{args.seed}_{args.base_epoch}')
+checkpoint_meta = torch.load(f'./checkpoint/ckpt.t7{args.name}_{args.meta_model}_{args.seed}')
 
 # if use_cuda:
 if args.dataset == 'CIFAR100':
     base_net = models.__dict__[args.base_model](16, 4, 100, 3)
 else:
     base_net = models.__dict__[args.base_model]()
-
-cudnn.benchmark = True
 
 base_net.load_state_dict(checkpoint_base['net'])
 base_net.eval()
@@ -164,6 +160,7 @@ else:
 if use_cuda:
     base_net = base_net.cuda()
     meta_net = meta_net.cuda()
+    cudnn.benchmark = True
 
 meta_net.load_state_dict(checkpoint_meta['meta_net'])
 meta_net.eval()
@@ -247,6 +244,8 @@ if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
                   base_preds, meta_preds)
 
 elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
+
+    # setup results
     out_dir = os.path.join('results', f'eval_{args.name}_{args.meta_model}_{args.seed}')
     if not os.path.exists(out_dir):
       os.mkdir(out_dir)
@@ -288,7 +287,7 @@ elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
         aupr_base_ent = res[2][2]
         aupr_base_maxp = res[2][3]
 
-        # save out results:
+        # save results:
         log_name = os.path.join(out_dir, f'{oodnames[i]}.csv')
 
         with open(log_name, 'w') as logfile:
@@ -297,8 +296,6 @@ elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
                                 'AUROC PREC', 'AUPR ENT', 'AUPR MAXP', 'AUPR MI', 'AUPR DENT',
                                 'AUPR PREC', 'AUROC BASE ENT', 'AUROC BASE MAXP',
                                 'AUPR BASE ENT', 'AUPR BASE MAXP'])
-
-            
             
             logwriter.writerow([auroc_ent, auroc_maxp, auroc_mi, auroc_dent, auroc_prec,
                                 aupr_ent, aupr_maxp, aupr_mi, aupr_dent, aupr_prec,

@@ -120,7 +120,7 @@ if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
     assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./checkpoint/ckpt.t7' + args.name + '_'+ str(args.seed)+ '_'+ str(args.epoch))
+    checkpoint = torch.load(f'./checkpoint/ckpt.t7{args.name}_{args.seed}_{args.epoch}')
     net = checkpoint['net']
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch'] + 1
@@ -136,13 +136,16 @@ else:
 
 if not os.path.isdir('results'):
     os.mkdir('results')
-logname = ('results/log_' + net.__class__.__name__ + '_' + args.name + '_' + str(args.seed) + '.csv')
+
+logname = f'results/log_{net.__class__.__name__}_{args.name}_{args.seed}.csv'
 
 if use_cuda:
-    net.cuda()
+    net = net.cuda()
     print(torch.cuda.device_count())
     cudnn.benchmark = True
     print('Using CUDA..')
+
+print("Training model on device:", next(net.parameters()).device)
 
 criterion = nn.CrossEntropyLoss()
 criterion_test = nn.CrossEntropyLoss()
@@ -157,12 +160,15 @@ def train(epoch):
     train_loss = 0
     correct = 0
     total = 0
+
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
+
         outputs, _ = net(inputs)
         loss = criterion(outputs, targets)
         train_loss += loss.item()
+
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -172,12 +178,15 @@ def train(epoch):
         optimizer.step()
 
         if args.verbose:
-            progress_bar(batch_idx, len(trainloader),'Loss: %.3f | Acc: %.3f%% (%d/%d)'% (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+            progress_bar(batch_idx, len(trainloader),
+                         'Loss: %.3f | Acc: %.3f%% (%d/%d)'%
+                         (train_loss/(batch_idx+1), 100*correct/total, correct, total))
 
     if not args.verbose:
-        print('Loss: %.3f | Acc: %.3f%% (%d/%d)'% (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+        print('Loss: %.3f | Acc: %.3f%% (%d/%d)'%
+              (train_loss/(batch_idx+1), 100*correct/total, correct, total))
 
-    return (train_loss/batch_idx, 100.*correct/total)
+    return (train_loss/batch_idx, 100*correct/total)
 
 '''
 Testing model
@@ -226,7 +235,7 @@ def checkpoint(acc, epoch):
     }
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    torch.save(state, './checkpoint/ckpt.t7' + args.name + '_'+ str(args.seed)+ '_'+ str(args.epoch))
+    torch.save(state, f'./checkpoint/ckpt.t7{args.name}_{args.seed}_{args.epoch}')
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -239,15 +248,17 @@ def adjust_learning_rate(optimizer, epoch):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-        
+# setup log file        
 with open(logname, 'w') as logfile:
     logwriter = csv.writer(logfile, delimiter=',')
     logwriter.writerow(['epoch', 'train loss', 'train acc', 'test loss', 'test acc'])
 
+# Train model
 for epoch in range(start_epoch, args.epoch):
     train_loss, train_acc = train(epoch)
     test_loss, test_acc = test(epoch)
     adjust_learning_rate(optimizer, epoch)
+
     with open(logname, 'a') as logfile:
         logwriter = csv.writer(logfile, delimiter=',')
         logwriter.writerow([epoch, train_loss, train_acc, test_loss, test_acc])
