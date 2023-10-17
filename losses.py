@@ -12,25 +12,35 @@ class BeliefMatchingLoss(nn.Module):
         self.coeff = coeff
 
     def forward(self, logits, ys):
+        
         alphas = torch.exp(logits)
         betas = self.prior * torch.ones_like(logits)
-        # alpha_hats = torch.ones_like(logits) * self.prior + torch.nn.functional.one_hot(ys, num_classes=10)
-        # return kl_div_dirichlets(alphas, alpha_hats)
 
         # compute log-likelihood loss: psi(alpha_target) - psi(alpha_zero)
         a_ans = torch.gather(alphas, -1, ys.unsqueeze(-1)).squeeze(-1)
         a_zero = torch.sum(alphas, -1)
+
+        # CE between predicted distribution and uniform prior
         ll_loss = digamma(a_ans) - digamma(a_zero)
 
+        # See equation 2.5 on page 26 of
+        # https://mast.queensu.ca/~communications/Papers/msc-jiayu-lin.pdf
+        # for derivation of closed for equation for KL divergence
+        # between two dirichlet distributions
+        
         # compute kl loss: loss1 + loss2
         #       loss1 = log_gamma(alpha_zero) - \sum_k log_gamma(alpha_zero)
         #       loss2 = sum_k (alpha_k - beta_k) (digamma(alpha_k) - digamma(alpha_zero) )
+
+        # have to do some expansion of term 1 of 2.5 to see this is true.
         loss1 = torch.lgamma(a_zero) - torch.sum(torch.lgamma(alphas), -1)
+
+        # makes sense (can be seen directly from term 2 of 2.5) 
         loss2 = torch.sum(
             (alphas - betas) * (digamma(alphas) - digamma(a_zero.unsqueeze(-1))),
             -1)
         kl_loss = loss1 + loss2
-
+        
         return ((self.coeff * kl_loss - ll_loss)).mean()
 
 

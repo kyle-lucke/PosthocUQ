@@ -238,19 +238,34 @@ def get_uncertainty_score(loader, label, get_preds=False):
 diff_ents, mis, ents, maxps, precs, labels, base_ents, base_maxps, base_energy, base_preds, meta_preds = \
     get_uncertainty_score(testloader, label=0, get_preds=True)
 
+# setup results directory
+out_dir = os.path.join('results', f'eval_{args.name}_{args.meta_model}_{args.seed}')
+if not os.path.exists(out_dir):
+    os.mkdir(out_dir)
+
 # evaluation
 if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
     # Evaluate misclassification performance (for test dataset)
-    ROC_Selective(diff_ents, mis, ents, maxps, precs,
-                  base_ents, base_maxps,
-                  base_preds, meta_preds)
+    res = ROC_Selective(diff_ents, mis, ents, maxps, precs,
+                        base_ents, base_maxps,
+                        base_preds, meta_preds)
 
+    aupr_ent = res[0]
+    aupr_maxp = res[1]
+
+    aupr_base_ent = res[2]
+    aupr_base_maxp = res[3]
+
+    # save results:
+    log_name = os.path.join(out_dir, f'misclassification.csv')
+
+    with open(log_name, 'w') as logfile:
+        logwriter = csv.writer(logfile, delimiter=',')
+        logwriter.writerow(['AUPR ENT', 'AUPR MAXP', 'AUPR BASE ENT', 'AUPR BASE MAXP'])
+            
+        logwriter.writerow([aupr_ent, aupr_maxp, aupr_base_ent, aupr_base_maxp])
+        
 elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
-
-    # setup results
-    out_dir = os.path.join('results', f'eval_{args.name}_{args.meta_model}_{args.seed}')
-    if not os.path.exists(out_dir):
-      os.mkdir(out_dir)
     
     for i in range(len(oodloaders)):
         print(oodnames[i])
