@@ -250,20 +250,29 @@ if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
                         base_ents, base_maxps,
                         base_preds, meta_preds)
 
-    aupr_ent = res[0]
-    aupr_maxp = res[1]
+    auroc_ent = res[0]
+    auroc_maxp = res[1]
+    
+    aupr_ent = res[2]
+    aupr_maxp = res[3]
 
-    aupr_base_ent = res[2]
-    aupr_base_maxp = res[3]
+    auroc_base_ent = res[4]
+    auroc_base_maxp = res[5]
+    
+    aupr_base_ent = res[6]
+    aupr_base_maxp = res[7]
 
     # save results:
     log_name = os.path.join(out_dir, f'misclassification.csv')
 
     with open(log_name, 'w') as logfile:
         logwriter = csv.writer(logfile, delimiter=',')
-        logwriter.writerow(['AUPR ENT', 'AUPR MAXP', 'AUPR BASE ENT', 'AUPR BASE MAXP'])
+            logwriter.writerow(['AUROC ENT', 'AUROC MAXP', 'AUPR ENT', 'AUPR MAXP',
+                                'AUROC BASE ENT', 'AUROC BASE MAXP', 'AUPR BASE ENT',
+                                'AUPR BASE MAXP'])
             
-        logwriter.writerow([aupr_ent, aupr_maxp, aupr_base_ent, aupr_base_maxp])
+            logwriter.writerow([auroc_ent, auroc_maxp, aupr_ent, aupr_maxp, auroc_base_ent,
+                                auroc_base_maxp, aupr_base_ent, aupr_base_maxp])
         
 elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
     
