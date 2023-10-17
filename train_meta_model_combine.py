@@ -224,12 +224,14 @@ if use_cuda:
     print(torch.cuda.device_count())
     cudnn.benchmark = True
 
+print("Base net is on device:", next(base_net.parameters()).device)
+print("Meta model is on device:", next(meta_net.parameters()).device)
+    
 base_net.load_state_dict(checkpoint['net'])
 base_net.eval()
 for k, v in base_net.named_parameters():
     v.requires_grad = False
 
-param_group = []
 meta_net.eval()
 
 optimizer = optim.SGD(meta_net.parameters(), momentum=0.9, weight_decay=args.decay, lr=args.lr)
