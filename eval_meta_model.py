@@ -141,7 +141,6 @@ assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
 checkpoint_base = torch.load(f'./checkpoint/ckpt.t7{args.dataset}_{args.seed}_{args.base_epoch}')
 checkpoint_meta = torch.load(f'./checkpoint/ckpt.t7{args.name}_{args.meta_model}_{args.seed}')
 
-# if use_cuda:
 if args.dataset == 'CIFAR100':
     base_net = models.__dict__[args.base_model](16, 4, 100, 3)
 else:
@@ -162,6 +161,9 @@ if use_cuda:
     meta_net = meta_net.cuda()
     cudnn.benchmark = True
 
+print("Base net is on device:", next(base_net.parameters()).device)
+print("Meta model is on device:", next(meta_net.parameters()).device)
+    
 meta_net.load_state_dict(checkpoint_meta['meta_net'])
 meta_net.eval()
 
