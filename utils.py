@@ -271,7 +271,9 @@ def ROC_Selective(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision,
     print('AUPR score of Base Model Total Entropy is', aupr_base_Ent)
     print('AUPR score of Base Model MaxP is', aupr_base_MaxP)
 
-    return [aupr_Ent * 100, aupr_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
+    return [auroc_ent * 100, auroc_MaxP * 100, aupr_Ent * 100, aupr_MaxP * 100,
+            auroc_base_ent * 100, auroc_base_MaxP * 100, aupr_base_Ent * 100,
+            aupr_base_MaxP * 100]
 
 
 def convert_to_rgb(x):
