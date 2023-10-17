@@ -250,11 +250,9 @@ def ROC_Selective(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision,
     auroc_precision = metrics.roc_auc_score(Meta_predicted.numpy(), -ood_precision.numpy())
     auroc_base_Ent = metrics.roc_auc_score(Base_predicted.numpy(), base_Ent.numpy())
     auroc_base_MaxP = metrics.roc_auc_score(Base_predicted.numpy(), 1 - base_MaxP.numpy())
-    print('AUROC score of Differential Entropy is', auroc_Dent)
-    print('AUROC score of Mutual Information is', auroc_MI)
+
     print('AUROC score of Total Entropy is', auroc_Ent)
     print('AUROC score of MaxP is', auroc_MaxP)
-    print('AUROC score of precision is', auroc_precision)
 
     print('AUROC score of Base Model Total Entropy is', auroc_base_Ent)
     print('AUROC score of Base Model MaxP is', auroc_base_MaxP)
@@ -266,17 +264,14 @@ def ROC_Selective(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision,
     aupr_precision = metrics.average_precision_score(Meta_predicted.numpy(), -ood_precision.numpy())
     aupr_base_Ent = metrics.average_precision_score(Base_predicted.numpy(), base_Ent.numpy())
     aupr_base_MaxP = metrics.average_precision_score(Base_predicted.numpy(), 1 - base_MaxP.numpy())
-    print('AUPR score of Differential Entropy is', aupr_Dent)
-    print('AUPR score of Mutual Information is', aupr_MI)
+    
     print('AUPR score of Total Entropy is', aupr_Ent)
     print('AUPR score of MaxP is', aupr_MaxP)
-    print('AUPR score of Precision is', aupr_precision)
-
+    
     print('AUPR score of Base Model Total Entropy is', aupr_base_Ent)
     print('AUPR score of Base Model MaxP is', aupr_base_MaxP)
 
-    return [auroc_Ent * 100, auroc_MaxP * 100, aupr_Ent * 100, aupr_MaxP * 100, auroc_base_Ent * 100,
-            auroc_base_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
+    return [aupr_Ent * 100, aupr_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
 
 
 def convert_to_rgb(x):
