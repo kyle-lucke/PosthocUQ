@@ -486,7 +486,7 @@ if __name__ == '__main__':
 
     print('Finished')
     training_time = time.perf_counter() - time_start
-    print('Total training time', training_time + "s")
+    print('Total training time', str(training_time) + ' seconds')
 
     if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
         checkpoint(0, args.epoch)
