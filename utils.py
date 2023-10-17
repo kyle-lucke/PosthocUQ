@@ -12,7 +12,52 @@ import torch.backends.cudnn as cudnn
 from sklearn import metrics
 from torch.distributions import MultivariateNormal, Normal
 from torch.distributions.distribution import Distribution
+import matplotlib.pyplot as plt
 
+def plot_auc_curve(labels, scores):
+
+    if isinstance(labels, torch.Tensor):
+        labels = labels.numpy()
+    
+    if isinstance(scores, torch.Tensor):
+        scores = scores.numpy()
+    
+    # calculate the fpr and tpr for all thresholds of the classification
+    fpr, tpr, threshold = metrics.roc_curve(labels, scores)
+    roc_auc = metrics.auc(fpr, tpr)
+
+    plt.title('Receiver Operating Characteristic')
+    
+    # plot AUC curve: FPR vs TPR at various thresholds
+    plt.plot(fpr, tpr, 'b', label=f'AUC={roc_auc:0.2f}')
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1],'r--')
+    
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([0, 1.025])
+
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.show()
+
+def plot_pr_curve(labels, scores):
+
+    if isinstance(labels, torch.Tensor):
+        labels = labels.numpy()
+    
+    if isinstance(scores, torch.Tensor):
+        scores = scores.numpy()
+
+    precision, recall, threshold = metrics.precision_recall_curve(labels, scores)
+    avg_precision = metrics.average_precision_score(labels, scores)
+
+    disp = metrics.PrecisionRecallDisplay(precision, recall, average_precision=avg_precision)
+    disp.plot()
+
+    plt.title('Precision Recall Curve')
+    
+    plt.show()
+            
 def set_seed(seed, use_cuda):
     torch.manual_seed(seed)
     np.random.seed(seed)
