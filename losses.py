@@ -19,8 +19,8 @@ class BeliefMatchingLoss(nn.Module):
         # compute log-likelihood loss: psi(alpha_target) - psi(alpha_zero)
         a_ans = torch.gather(alphas, -1, ys.unsqueeze(-1)).squeeze(-1)
         a_zero = torch.sum(alphas, -1)
-
-        # CE between predicted distribution and uniform prior
+        
+        # CE between predicted distribution and variational dirichlet
         ll_loss = digamma(a_ans) - digamma(a_zero)
 
         # See equation 2.5 on page 26 of
