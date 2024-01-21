@@ -13,7 +13,7 @@ import torch.utils.data as data
 import random
 
 import models
-from utils import progress_bar, set_seed
+from utils import progress_bar, set_seed, convert_to_rgb
 
 parser = argparse.ArgumentParser(description='Base model training')
 parser.add_argument('--lr', default=1e-1, type=float, help='learning rate')
@@ -90,21 +90,21 @@ elif args.dataset == 'MNIST':
     if args.augment:
         transform_train = transforms.Compose([
             transforms.Resize(32),
-            transforms.Lambda(lambda x: x.convert("RGB")),
+            transforms.Lambda(convert_to_rgb),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
     else:
         transform_train = transforms.Compose([
             transforms.Resize(32),
-            transforms.Lambda(lambda x: x.convert("RGB")),
+            transforms.Lambda(convert_to_rgb),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
     transform_test = transforms.Compose([
         transforms.Resize(32),
-        transforms.Lambda(lambda x: x.convert("RGB")),
+        transforms.Lambda(convert_to_rgb),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
