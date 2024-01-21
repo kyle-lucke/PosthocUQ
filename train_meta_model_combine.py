@@ -25,11 +25,11 @@ parser = argparse.ArgumentParser(description='Meta model training')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
 parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
 parser.add_argument('--base_model', default="WideResNet_BaseModel", type=str, help='model type (default: LeNet)')
-parser.add_argument('--base_epoch', default=200, type=int, help='total epochs to train base model')
+parser.add_argument('--base_epoch', default=200, type=int, help='total epochs base model was trained for')
 parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type=str,
                     help='model type (default: LeNet)')
 parser.add_argument('--name', default='CIFAR100_OOD', type=str, help='name of run')
-parser.add_argument('--dataset', default='CIFAR100', type=str, help='name of run')
+parser.add_argument('--dataset', default='CIFAR100', type=str, help='Dataset to use for run')
 parser.add_argument('--seed', default=1, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
@@ -216,6 +216,8 @@ if args.dataset in ['CIFAR10', 'CIFAR100']:
                                                 fea_dim5=args.fea_dim[4])
 else:
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
+
+# transfer models to correct device
 if use_cuda:
     base_net = base_net.cuda()
     meta_net = meta_net.cuda()
@@ -226,7 +228,8 @@ if use_cuda:
 
 print("Base net is on device:", next(base_net.parameters()).device)
 print("Meta model is on device:", next(meta_net.parameters()).device)
-    
+
+# Load base net state dictionary
 base_net.load_state_dict(checkpoint['net'])
 base_net.eval()
 for k, v in base_net.named_parameters():
@@ -245,7 +248,6 @@ logname = f'results/log_{meta_net.__class__.__name__}_{args.name}_{args.seed}.cs
 Training Meta-model
 '''
 vi_loss = BeliefMatchingLoss(args.lambda_KL, 1)
-
 
 def compute_logits_and_loss(xs, ys, compute_loss=False):
     loss = torch.Tensor([0])
