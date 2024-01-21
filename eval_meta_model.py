@@ -267,12 +267,12 @@ if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
 
     with open(log_name, 'w') as logfile:
         logwriter = csv.writer(logfile, delimiter=',')
-            logwriter.writerow(['AUROC ENT', 'AUROC MAXP', 'AUPR ENT', 'AUPR MAXP',
-                                'AUROC BASE ENT', 'AUROC BASE MAXP', 'AUPR BASE ENT',
-                                'AUPR BASE MAXP'])
+        logwriter.writerow(['AUROC ENT', 'AUROC MAXP', 'AUPR ENT', 'AUPR MAXP',
+                            'AUROC BASE ENT', 'AUROC BASE MAXP', 'AUPR BASE ENT',
+                            'AUPR BASE MAXP'])
             
-            logwriter.writerow([auroc_ent, auroc_maxp, aupr_ent, aupr_maxp, auroc_base_ent,
-                                auroc_base_maxp, aupr_base_ent, aupr_base_maxp])
+        logwriter.writerow([auroc_ent, auroc_maxp, aupr_ent, aupr_maxp, auroc_base_ent,
+                            auroc_base_maxp, aupr_base_ent, aupr_base_maxp])
         
 elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
     
