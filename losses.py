@@ -20,9 +20,13 @@ class BeliefMatchingLoss(nn.Module):
         a_ans = torch.gather(alphas, -1, ys.unsqueeze(-1)).squeeze(-1)
         a_zero = torch.sum(alphas, -1)
         
-        # CE between predicted distribution and variational dirichlet
-        ll_loss = digamma(a_ans) - digamma(a_zero)
+        # expectation of CE loss between predicted distribution and
+        # variational dirichlet distribution
 
+        # Encourages mass of predcited distribution to be concentrated
+        # at point corresponding to GT label
+        ll_loss = digamma(a_ans) - digamma(a_zero)
+        
         # See equation 2.5 on page 26 of
         # https://mast.queensu.ca/~communications/Papers/msc-jiayu-lin.pdf
         # for derivation of closed for equation for KL divergence
@@ -39,6 +43,8 @@ class BeliefMatchingLoss(nn.Module):
         loss2 = torch.sum(
             (alphas - betas) * (digamma(alphas) - digamma(a_zero.unsqueeze(-1))),
             -1)
+
+        # discourages over fitting to GT distribution
         kl_loss = loss1 + loss2
         
         return ((self.coeff * kl_loss - ll_loss)).mean()
