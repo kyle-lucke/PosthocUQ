@@ -14,6 +14,7 @@ import random
 
 import models
 from utils import progress_bar, set_seed, convert_to_rgb
+from model_utils import * 
 
 parser = argparse.ArgumentParser(description='Base model training')
 parser.add_argument('--lr', default=1e-1, type=float, help='learning rate')
@@ -36,82 +37,88 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 set_seed(args.seed, use_cuda)
 
+if args.dataset == 'CIFAR10':
+    args.epoch = 250    
+elif args.dataset == 'CIFAR10':
+    args.epoch = 170
+else:
+    args.epoch = 100
+    
 '''
 Processing data
 '''
 print('==> Preparing data..')
 if args.dataset=='CIFAR10':
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
+    transform_train, _ = get_preprocessor(args.dataset) 
+    
+    dataset = datasets.CIFAR10(root='~/data', train=True, download=True,
+                               transform=transform_train)
 
-    dataset = datasets.CIFAR10(root='~/data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    testset = datasets.CIFAR10(root='~/data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+    train_idxs = np.load('dataset_idxs/cifar10/train_idx.npy')
+    val_idxs = np.load('dataset_idxs/cifar10/val_idx.npy')
+    
+    train_dataset = data.Subset(dataset, train_idxs)
+    val_dataset = data.Subset(datast, val_idxs)
+    
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=8)
+
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
+                                              shuffle=False, num_workers=8)
+    
 elif args.dataset=='CIFAR100':
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
+    transform_train, _ = get_preprocessor(args.dataset) 
 
     dataset = datasets.CIFAR100(root='~/data', train=True, download=True, transform=transform_train)
     trainloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    testset = datasets.CIFAR100(root='~/data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
-elif args.dataset == 'MNIST':
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.Resize(32),
-            transforms.Lambda(convert_to_rgb),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.Resize(32),
-            transforms.Lambda(convert_to_rgb),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.Resize(32),
-        transforms.Lambda(convert_to_rgb),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    train_idxs = np.load('dataset_idxs/cifar100/train_idx.npy')
+    val_idxs = np.load('dataset_idxs/cifar100/val_idx.npy')
+    
+    train_dataset = data.Subset(dataset, train_idxs)
+    val_dataset = data.Subset(datast, val_idxs)
+
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=8)
+
+    valloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
+                                              shuffle=False, num_workers=8)
+
+elif args.dataset == 'MNIST':
+
+    transform_train, _ = get_preprocessor(args.dataset) 
+    
     dataset = datasets.MNIST(root='~/data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    testset = datasets.MNIST(root='~/data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+
+    train_idxs = np.load('dataset_idxs/mnist/train_idx.npy')
+    val_idxs = np.load('dataset_idxs/mnist/val_idx.npy')
+    
+    train_dataset = data.Subset(dataset, train_idxs)
+    val_dataset = data.Subset(datast, val_idxs)
+    
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=8)
+
+    valloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
+                                              shuffle=False, num_workers=8)
+    
+elif args.dataset == 'SVHN':
+
+    transform_train, _ = get_preprocessor(args.dataset)
+
+    train_idxs = np.load('dataset_idxs/svhn/train_idx.npy')
+    val_idxs = np.load('dataset_idxs/svhn/val_idx.npy')
+    
+    train_dataset = data.Subset(dataset, train_idxs)
+    val_dataset = data.Subset(datast, val_idxs)
+    
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=8)
+
+    valloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
+                                              shuffle=False, num_workers=8)
 
 '''
 Preparing model
@@ -129,8 +136,11 @@ if args.resume:
 else:
     print('==> Building model..')
     if args.dataset == 'CIFAR100':
-        #WideResNet-16
-        net = models.__dict__[args.model](16, 4, 100, 3)
+        net = models.__dict__[args.model](100)
+        net.init_vgg16_params()
+    elif args.dataset == 'CIFAR10':
+        net = model.__dict__[args.model](10)
+        net.init_vgg16_params()
     else:
         net = models.__dict__[args.model]()
 
@@ -149,8 +159,17 @@ print("Training model on device:", next(net.parameters()).device)
 
 criterion = nn.CrossEntropyLoss()
 criterion_test = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.decay)
 
+if args.dataset == 'CIFAR10':
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+    
+elif args.dataset == 'CIFAR100':
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0001)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[90, 135], verbose=True)
+
+else:
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0001)
+    
 '''
 Training model
 '''
@@ -184,7 +203,7 @@ def train(epoch):
 
     if not args.verbose:
         print('Loss: %.3f | Acc: %.3f%% (%d/%d)'%
-              (train_loss/(batch_idx+1), 100*correct/total, correct, total))
+              (train_loss/len(train_loader), 100*correct/total, correct, total))
 
     return (train_loss/batch_idx, 100*correct/total)
 
@@ -198,7 +217,7 @@ def test(epoch):
     correct = 0
     total = 0
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(testloader):
+        for batch_idx, (inputs, targets) in enumerate(valloader):
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
             outputs, _ = net(inputs)
@@ -210,10 +229,10 @@ def test(epoch):
             correct += predicted.eq(targets.data).cpu().sum()
 
             if args.verbose:
-                progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                progress_bar(batch_idx, len(valloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
                 
     if not args.verbose:
-        print('Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+        print('Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / len(valloader), 100. * correct / total, correct, total))
 
     acc = 100.*correct/total
     if epoch == start_epoch + args.epoch - 1 or acc > best_acc:
@@ -237,28 +256,19 @@ def checkpoint(acc, epoch):
         os.mkdir('checkpoint')
     torch.save(state, f'./checkpoint/ckpt.t7{args.name}_{args.seed}_{args.epoch}')
 
-
-def adjust_learning_rate(optimizer, epoch):
-    """decrease the learning rate at 100 and 150 epoch"""
-    lr = args.lr
-    if epoch >= 50:
-        lr /= 10
-    if epoch >= 100:
-        lr /= 100
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
 # setup log file        
 with open(logname, 'w') as logfile:
     logwriter = csv.writer(logfile, delimiter=',')
-    logwriter.writerow(['epoch', 'train loss', 'train acc', 'test loss', 'test acc'])
+    logwriter.writerow(['epoch', 'train loss', 'train acc', 'val loss', 'val acc'])
 
 # Train model
 for epoch in range(start_epoch, args.epoch):
     train_loss, train_acc = train(epoch)
     test_loss, test_acc = test(epoch)
-    adjust_learning_rate(optimizer, epoch)
 
+    if args.dataset == 'CIFAR100':
+        scheduler.step()
+    
     with open(logname, 'a') as logfile:
         logwriter = csv.writer(logfile, delimiter=',')
         logwriter.writerow([epoch, train_loss, train_acc, test_loss, test_acc])

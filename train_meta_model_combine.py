@@ -20,6 +20,7 @@ from losses import BeliefMatchingLoss
 from metrics import compute_total_entropy, compute_max_prob, compute_differential_entropy, compute_mutual_information, \
     compute_precision
 from utils import progress_bar, convert_to_rgb, set_seed
+from model_utils import *
 
 parser = argparse.ArgumentParser(description='Meta model training')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
@@ -48,10 +49,12 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 best_auroc = 0
 
 if args.dataset == 'MNIST':
-    args.fea_dim = [6*14*14, 5*5*16]
-else:
+    args.fea_dim = [5408, 9216]
+elif args.dataset == 'SVHN':
+    args.fea_dim = [8192, 4096, 2048]
+else: # CIFAR10 or CIFAR100
     args.fea_dim = [16384, 8192, 4096, 2048, 512]
-
+    
 set_seed(args.seed, use_cuda)
 
 print('==> Loading base model checkpoint..')
@@ -65,9 +68,8 @@ Processing data
 print('==> Preparing data..')
 # Noisy validation set for OOD
 if args.dataset == 'MNIST':
+    transforms.Resize(28),
     transform_noise = transforms.Compose([
-        transforms.Resize(32),
-        transforms.Lambda(convert_to_rgb),
         transforms.ToTensor(),
         pre.GaussianFilter(),
     ])
@@ -82,37 +84,23 @@ else:
 
 if args.dataset == 'CIFAR10':
     print('CIFAR10')
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
+    transform_train, transform_test = get_preprocessor(args.dataset)
+    
     dataset = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=True, transform=transform_train)
     dataset_val = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_test)
+
     dataset_noise = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_noise)
-    num_total_data = int(len(dataset))
-    random.seed(args.seed)
-    data_list = list(range(num_total_data))
-    random.shuffle(data_list)
-    train_list = data_list[:40000]
-    val_list = data_list[40000:]
+
+    train_list = np.load('dataset_idxs/cifar10/train_idxs.py')
+    val_list = np.load('dataset_idxs/cifar10/val_idxs.py')
+
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset_val, val_list)
     valset_noise = data.Subset(dataset_noise, val_list)
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
+
     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
                                                   num_workers=8)
@@ -121,33 +109,16 @@ if args.dataset == 'CIFAR10':
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
 elif args.dataset == 'CIFAR100':
-    print('CIFAR100')
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
+    transform_train, transform_test = get_preprocessor(args.dataset)
+    
     dataset = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=True, transform=transform_train)
     dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
     dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
-    num_total_data = int(len(dataset))
-    random.seed(args.seed)
-    data_list = list(range(num_total_data))
-    random.shuffle(data_list)
-    train_list = data_list[:40000]
-    val_list = data_list[40000:]
+    
+    train_list = np.load('dataset_idxs/cifar100/train_idxs.npy')
+    val_list = np.load('dataset_idxs/cifar100/val_idxs.npy')
+
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset_val, val_list)
     valset_noise = data.Subset(dataset_noise, val_list)
@@ -160,36 +131,16 @@ elif args.dataset == 'CIFAR100':
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
 elif args.dataset == 'MNIST':
-    if args.augment:
-        transform_train = transforms.Compose([
-            transforms.Resize(32),
-            transforms.Lambda(convert_to_rgb),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-    else:
-        transform_train = transforms.Compose([
-            transforms.Resize(32),
-            transforms.Lambda(convert_to_rgb),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
 
-    transform_test = transforms.Compose([
-        transforms.Resize(32),
-        transforms.Lambda(convert_to_rgb),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    transform_train, transform_test = get_preprocessor(args.dataset)
+    
     dataset = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_train)
     dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
     dataset_noise = datasets.MNIST(root='~/data/MNIST', train=True, download=False, transform=transform_noise)
-    num_total_data = int(len(dataset))
-    random.seed(args.seed)
-    data_list = list(range(num_total_data))
-    random.shuffle(data_list)
-    train_list = data_list[:50000]
-    val_list = data_list[50000:]
+    
+    train_list = np.load('dataset_idxs/mnist/train_idxs.npy')
+    val_list = np.load('dataset_idxs/mnist/val_idxs.npy')
+
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset, val_list)
     valset_noise = data.Subset(dataset_noise, val_list)
@@ -201,12 +152,37 @@ elif args.dataset == 'MNIST':
     testset = datasets.MNIST(root='~/data/MNIST', train=False, download=False, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
+elif args.dataset == 'SVHN':
+
+    transform_train, transform_test = get_preprocessor(args.dataset)
+    
+    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True, transform=transform_train)
+    dataset_val = datasets.SVHN(root='~/data/SVHN', split='train', download=True, transform=transform_test)
+    dataset_noise = datasets.SVHN(root='~/data/SVHN', split='train', download=False, transform=transform_noise)
+    
+    train_list = np.load('dataset_idxs/svhn/train_idxs.npy')
+    val_list = np.load('dataset_idxs/svhn/val_idxs.npy')
+
+    trainset = data.Subset(dataset, train_list)
+    valset = data.Subset(dataset, val_list)
+    valset_noise = data.Subset(dataset_noise, val_list)
+
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
+    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
+    valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
+                                                  shuffle=False, num_workers=8)
+    
+    testset = datasets.SVHN(root='~/data/SVHN', split='test', download=False, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+
 
 '''
 Preparing model
 '''
 if args.dataset == 'CIFAR100':
-    base_net = models.__dict__[args.base_model](16, 4, 100, 3)
+    base_net = models.__dict__[args.base_model](100)
+elif args.dataset == 'CIFAR10':
+    base_net = models.__dict__[args.base_model](10)
 else:
     base_net = models.__dict__[args.base_model]()
 
@@ -214,10 +190,14 @@ if args.dataset in ['CIFAR10', 'CIFAR100']:
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
                                                 fea_dim5=args.fea_dim[4])
+elif args.dataset == 'SVHN':
+    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
+                                                fea_dim3=args.fea_dim[2])
+
 else:
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
 
-# transfer models to correct device
+# transfer models to device
 if use_cuda:
     base_net = base_net.cuda()
     meta_net = meta_net.cuda()
@@ -291,7 +271,7 @@ def train(epoch):
 
     if not args.verbose:
       print('Loss: %.3f |  Acc: %.3f%% (%d/%d)' %
-            (train_loss/(batch_idx + 1), 100*correct/total, correct, total))
+            (train_loss/len(trainloader), 100*correct/total, correct, total))
 
     train_loss_final = train_loss/batch_idx
     acc = 100*correct/total
@@ -345,7 +325,7 @@ def test(epoch):
 
         if not args.verbose:
             print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                  (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
+                  (test_loss/len(testloader), 100*correct/total, correct, total,
                    diff_entropy/total, mutual_info/total,total_entropy/total,
                    max_prob/total, precision/total))
             
@@ -408,7 +388,6 @@ def UQ_validation():
 '''
 Inference the meta-model on OOD dataset (noisy images)
 '''
-
 
 def OOD(epoch):
     base_net.eval()
