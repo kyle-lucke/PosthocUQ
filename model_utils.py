@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as transforms
 
 def get_preprocessor(dataset):
-  if model_name == 'MNIST':
+  if dataset == 'MNIST':
 
     normalize = transforms.Normalize(mean=[0.1307,],
                                  std=[0.3081,])
@@ -16,7 +16,7 @@ def get_preprocessor(dataset):
       normalize
     ])
     
-  elif model_name == 'SVHN':
+  elif dataset == 'SVHN':
 
     normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
                                      std=[0.5, 0.5, 0.5])
@@ -31,7 +31,7 @@ def get_preprocessor(dataset):
     ])
 
     
-  elif model_name == 'CIFAR10':
+  elif dataset == 'CIFAR10':
 
     normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
                                      std=[0.2023, 0.1994, 0.2010])
@@ -47,7 +47,7 @@ def get_preprocessor(dataset):
       normalize
     ])
     
-  elif model_name == 'CIFAR100':
+  elif dataset == 'CIFAR100':
 
     normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
                                  std=[0.2023, 0.1994, 0.2010])

@@ -17,7 +17,7 @@ from utils import progress_bar, set_seed, convert_to_rgb
 from model_utils import * 
 
 parser = argparse.ArgumentParser(description='Base model training')
-parser.add_argument('--lr', default=1e-1, type=float, help='learning rate')
+# parser.add_argument('--lr', default=1e-1, type=float, help='learning rate')
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
 parser.add_argument('--model', default="VGG16_BaseModel", type=str, help='model type (default: VGG16_BaseModel)')
 parser.add_argument('--name', default='CIFAR10', type=str, help='name of run')
@@ -25,8 +25,8 @@ parser.add_argument('--dataset', default='CIFAR10', type=str, help='name of run'
 parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=100, type=int, help='total epochs to run')
-parser.add_argument('--no-augment', dest='augment', action='store_false', help='use standard augmentation (default: True)')
-parser.add_argument('--decay', default=1e-4, type=float, help='weight decay')
+# parser.add_argument('--no-augment', dest='augment', action='store_false', help='use standard augmentation (default: True)')
+# parser.add_argument('--decay', default=1e-4, type=float, help='weight decay')
 parser.add_argument('--verbose', action='store_true', help='Weather or not to use progress bar during model training (default: False).')
 args = parser.parse_args()
 
@@ -37,9 +37,11 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 set_seed(args.seed, use_cuda)
 
+args.batch_size = 128
+
 if args.dataset == 'CIFAR10':
     args.epoch = 250    
-elif args.dataset == 'CIFAR10':
+elif args.dataset == 'CIFAR100':
     args.epoch = 170
 else:
     args.epoch = 100
@@ -59,12 +61,12 @@ if args.dataset=='CIFAR10':
     val_idxs = np.load('dataset_idxs/cifar10/val_idx.npy')
     
     train_dataset = data.Subset(dataset, train_idxs)
-    val_dataset = data.Subset(datast, val_idxs)
+    val_dataset = data.Subset(dataset, val_idxs)
     
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                               shuffle=True, num_workers=8)
 
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
+    valloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size,
                                               shuffle=False, num_workers=8)
     
 elif args.dataset=='CIFAR100':
@@ -78,7 +80,7 @@ elif args.dataset=='CIFAR100':
     val_idxs = np.load('dataset_idxs/cifar100/val_idx.npy')
     
     train_dataset = data.Subset(dataset, train_idxs)
-    val_dataset = data.Subset(datast, val_idxs)
+    val_dataset = data.Subset(dataset, val_idxs)
 
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                               shuffle=True, num_workers=8)
@@ -96,7 +98,7 @@ elif args.dataset == 'MNIST':
     val_idxs = np.load('dataset_idxs/mnist/val_idx.npy')
     
     train_dataset = data.Subset(dataset, train_idxs)
-    val_dataset = data.Subset(datast, val_idxs)
+    val_dataset = data.Subset(dataset, val_idxs)
     
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                               shuffle=True, num_workers=8)
@@ -108,11 +110,13 @@ elif args.dataset == 'SVHN':
 
     transform_train, _ = get_preprocessor(args.dataset)
 
+    dataset = datasets.SVHN(root='~/data', split='train', download=True, transform=transform_train)
+    
     train_idxs = np.load('dataset_idxs/svhn/train_idx.npy')
     val_idxs = np.load('dataset_idxs/svhn/val_idx.npy')
     
     train_dataset = data.Subset(dataset, train_idxs)
-    val_dataset = data.Subset(datast, val_idxs)
+    val_dataset = data.Subset(dataset, val_idxs)
     
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                               shuffle=True, num_workers=8)
@@ -139,7 +143,7 @@ else:
         net = models.__dict__[args.model](100)
         net.init_vgg16_params()
     elif args.dataset == 'CIFAR10':
-        net = model.__dict__[args.model](10)
+        net = models.__dict__[args.model](10)
         net.init_vgg16_params()
     else:
         net = models.__dict__[args.model]()
@@ -161,14 +165,14 @@ criterion = nn.CrossEntropyLoss()
 criterion_test = nn.CrossEntropyLoss()
 
 if args.dataset == 'CIFAR10':
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
     
 elif args.dataset == 'CIFAR100':
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0001)
+    optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0001)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[90, 135], verbose=True)
 
-else:
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0001)
+else: # MNIST, SVHN
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0001)
     
 '''
 Training model
@@ -203,7 +207,7 @@ def train(epoch):
 
     if not args.verbose:
         print('Loss: %.3f | Acc: %.3f%% (%d/%d)'%
-              (train_loss/len(train_loader), 100*correct/total, correct, total))
+              (train_loss/len(trainloader), 100*correct/total, correct, total))
 
     return (train_loss/batch_idx, 100*correct/total)
 

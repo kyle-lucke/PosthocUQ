@@ -92,8 +92,8 @@ if args.dataset == 'CIFAR10':
 
     dataset_noise = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_noise)
 
-    train_list = np.load('dataset_idxs/cifar10/train_idxs.py')
-    val_list = np.load('dataset_idxs/cifar10/val_idxs.py')
+    train_list = np.load('dataset_idxs/cifar10/train_idx.npy')
+    val_list = np.load('dataset_idxs/cifar10/val_idx.npy')
 
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset_val, val_list)
@@ -116,8 +116,8 @@ elif args.dataset == 'CIFAR100':
     dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
     dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
     
-    train_list = np.load('dataset_idxs/cifar100/train_idxs.npy')
-    val_list = np.load('dataset_idxs/cifar100/val_idxs.npy')
+    train_list = np.load('dataset_idxs/cifar100/train_idx.npy')
+    val_list = np.load('dataset_idxs/cifar100/val_idx.npy')
 
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset_val, val_list)
@@ -138,8 +138,8 @@ elif args.dataset == 'MNIST':
     dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
     dataset_noise = datasets.MNIST(root='~/data/MNIST', train=True, download=False, transform=transform_noise)
     
-    train_list = np.load('dataset_idxs/mnist/train_idxs.npy')
-    val_list = np.load('dataset_idxs/mnist/val_idxs.npy')
+    train_list = np.load('dataset_idxs/mnist/train_idx.npy')
+    val_list = np.load('dataset_idxs/mnist/val_idx.npy')
 
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset, val_list)
@@ -160,8 +160,8 @@ elif args.dataset == 'SVHN':
     dataset_val = datasets.SVHN(root='~/data/SVHN', split='train', download=True, transform=transform_test)
     dataset_noise = datasets.SVHN(root='~/data/SVHN', split='train', download=False, transform=transform_noise)
     
-    train_list = np.load('dataset_idxs/svhn/train_idxs.npy')
-    val_list = np.load('dataset_idxs/svhn/val_idxs.npy')
+    train_list = np.load('dataset_idxs/svhn/train_idx.npy')
+    val_list = np.load('dataset_idxs/svhn/val_idx.npy')
 
     trainset = data.Subset(dataset, train_list)
     valset = data.Subset(dataset, val_list)
@@ -469,5 +469,5 @@ if __name__ == '__main__':
     training_time = time.perf_counter() - time_start
     print('Total training time', str(training_time) + ' seconds')
 
-    if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
+    if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss', 'SVHN_miss']:
         checkpoint(0, args.epoch)
