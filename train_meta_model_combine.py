@@ -52,8 +52,10 @@ if args.dataset == 'MNIST':
     args.fea_dim = [5408, 9216]
 elif args.dataset == 'SVHN':
     args.fea_dim = [8192, 4096, 2048]
-else: # CIFAR10 or CIFAR100
-    args.fea_dim = [16384, 8192, 4096, 2048, 512]
+elif args.dataset == 'CIFAR10':
+    args.fea_dim = [16384, 8192, 4096, 2048, 512, 10]
+elif args.dataset == 'CIFAR100':
+    args.fea_dim = [16384, 8192, 4096, 2048, 512, 100]
     
 set_seed(args.seed, use_cuda)
 
@@ -189,7 +191,7 @@ else:
 if args.dataset in ['CIFAR10', 'CIFAR100']:
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
-                                                fea_dim5=args.fea_dim[4])
+                                                fea_dim5=args.fea_dim[4], n_classes=args.fea_dim[5])
 elif args.dataset == 'SVHN':
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2])

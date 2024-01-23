@@ -249,32 +249,32 @@ VGG16 meta-model
 '''
 
 class VGG16_MetaModel_combine(nn.Module):
-    def __init__(self, fea_dim1, fea_dim2, fea_dim3, fea_dim4, fea_dim5):
+    def __init__(self, fea_dim1, fea_dim2, fea_dim3, fea_dim4, fea_dim5, n_classes):
         super(VGG16_MetaModel_combine, self).__init__()
         self.pooling = nn.MaxPool1d(kernel_size=2, stride=2)
         self.classifier1_fc1 = nn.Linear(fea_dim1, 8192)
         self.classifier1_fc2 = nn.Linear(4096, 2048)
         self.classifier1_fc3 = nn.Linear(1024, 512)
-        self.classifier1_fc4 = nn.Linear(256, 10)
+        self.classifier1_fc4 = nn.Linear(256, n_classes)
 
         self.classifier2_fc1 = nn.Linear(fea_dim2, 4096)
         self.classifier2_fc2 = nn.Linear(2048, 1024)
         self.classifier2_fc3 = nn.Linear(512, 256)
-        self.classifier2_fc4 = nn.Linear(256, 10)
+        self.classifier2_fc4 = nn.Linear(256, n_classes)
 
         self.classifier3_fc1 = nn.Linear(fea_dim3, 2048)
         self.classifier3_fc2 = nn.Linear(1024, 512)
         self.classifier3_fc3 = nn.Linear(512, 256)
-        self.classifier3_fc4 = nn.Linear(256, 10)
+        self.classifier3_fc4 = nn.Linear(256, n_classes)
 
         self.classifier4_fc1 = nn.Linear(fea_dim4, 1024)
         self.classifier4_fc2 = nn.Linear(512, 256)
-        self.classifier4_fc3 = nn.Linear(256, 10)
+        self.classifier4_fc3 = nn.Linear(256, n_classes)
 
         self.classifier5_fc1 = nn.Linear(fea_dim5, 256)
-        self.classifier5_fc2 = nn.Linear(256, 10)
+        self.classifier5_fc2 = nn.Linear(256, n_classes)
 
-        self.classifier_final = nn.Linear(5 * 10, 10)
+        self.classifier_final = nn.Linear(5 * n_classes, n_classes)
 
     def forward(self, fea1, fea2, fea3, fea4, fea5):
         fea1 = F.relu(self.classifier1_fc1(fea1))
