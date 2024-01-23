@@ -49,7 +49,7 @@ class SmallConvNetMNIST_MetaModel_combine(nn.Module):
     self.pooling = nn.MaxPool1d(kernel_size=2, stride=2)
     
     # Meta Model Layers
-    self.classifier1_fc1 = nn.Linear(fea_dim3, 2048)
+    self.classifier1_fc1 = nn.Linear(fea_dim1, 2048)
     self.classifier1_fc2 = nn.Linear(1024, 512)
     self.classifier1_fc3 = nn.Linear(512, 256)
     self.classifier1_fc4 = nn.Linear(256, 10)
