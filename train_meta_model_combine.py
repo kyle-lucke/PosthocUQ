@@ -25,12 +25,20 @@ from model_utils import *
 parser = argparse.ArgumentParser(description='Meta model training')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
 parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
-parser.add_argument('--base_model', default="WideResNet_BaseModel", type=str, help='model type (default: LeNet)')
-parser.add_argument('--base_epoch', default=200, type=int, help='total epochs base model was trained for')
+parser.add_argument('--base_model', default="WideResNet_BaseModel",
+                    choices=('SmallConvNetSVHN_BaseModel', 'ResNetWrapper'),
+                    type=str, help='model type (default: LeNet)')
+# parser.add_argument('--base_epoch', default=200, type=int, help='total epochs base model was trained for')
+
 parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type=str,
+                    choices=('SmallConvNetSVHN_MetaModel_combine', 'Resnet_MetaModel_combine'),
                     help='model type (default: LeNet)')
-parser.add_argument('--name', default='CIFAR100_OOD', type=str, help='name of run')
-parser.add_argument('--dataset', default='CIFAR100', type=str, help='Dataset to use for run')
+
+parser.add_argument('--name', default='CIFAR100_OOD', choices=('CIFAR10_miss', 'SVHN_miss'),
+                    type=str, help='name of run')
+
+
+parser.add_argument('--dataset', default='CIFAR10', choices=('CIFAR10', 'SVHN'), type=str, help='Dataset to use for run')
 parser.add_argument('--seed', default=1, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
@@ -44,25 +52,23 @@ args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
-best_acc = 0  # best test accuracy
+# best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 best_auroc = 0
 
-if args.dataset == 'MNIST':
-    args.fea_dim = [5408, 9216]
-elif args.dataset == 'SVHN':
+if args.dataset == 'SVHN':
     args.fea_dim = [8192, 4096, 2048]
-elif args.dataset == 'CIFAR10':
-    args.fea_dim = [16384, 8192, 4096, 2048, 512, 10]
-elif args.dataset == 'CIFAR100':
-    args.fea_dim = [16384, 8192, 4096, 2048, 512, 100]
+# elif args.dataset == 'MNIST':
+#     args.fea_dim = [5408, 9216]
+# elif args.dataset == 'CIFAR10' and args.base_model == 'VGG16_BaseModel':
+#     args.fea_dim = [16384, 8192, 4096, 2048, 512, 10]
+elif args.dataset == 'CIFAR10' and args.base_model == 'ResNetWrapper':
+    args.fea_dim = [8192, 8192, 4096, 4096, 64, 10]
+    
+# elif args.dataset == 'CIFAR100':
+#     args.fea_dim = [16384, 8192, 4096, 2048, 512, 100]
     
 set_seed(args.seed, use_cuda)
-
-print('==> Loading base model checkpoint..')
-assert os.path.isdir('./checkpoint'), 'Error: no checkpoint directory found!'
-checkpoint = torch.load(f'./checkpoint/ckpt.t7{args.dataset}_{args.seed}_{args.base_epoch}',
-                        map_location=torch.device('cpu') if not use_cuda else None)
 
 '''
 Processing data
@@ -87,117 +93,158 @@ else:
 if args.dataset == 'CIFAR10':
     print('CIFAR10')
 
-    transform_train, transform_test = get_preprocessor(args.dataset)
+    _, transform_test = get_preprocessor(args.dataset)
     
-    dataset = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=True, transform=transform_train)
-    dataset_val = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_test)
-
-    dataset_noise = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False, transform=transform_noise)
-
-    train_list = np.load('dataset_idxs/cifar10/train_idx.npy')
-    val_list = np.load('dataset_idxs/cifar10/val_idx.npy')
-
-    trainset = data.Subset(dataset, train_list)
-    valset = data.Subset(dataset_val, val_list)
-    valset_noise = data.Subset(dataset_noise, val_list)
-
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-
-    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
-    valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
-                                                  num_workers=8)
-
-    testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
-
-elif args.dataset == 'CIFAR100':
-
-    transform_train, transform_test = get_preprocessor(args.dataset)
+    dataset = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=True,
+                               transform=transform_test)
     
-    dataset = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=True, transform=transform_train)
-    dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
-    dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
+    dataset_val = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False,
+                                   transform=transform_test)
+
+    dataset_noise = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=False,
+                                     transform=transform_noise)
+
+    # load indices used during our training
+    train_meta_idxs = np.load('trained-base-models/cifar10-resnet32/trainset_meta_idxs.npy')
+    val_idxs = np.load('trained-base-models/cifar10-resnet32/val_idxs.npy')
+
+    trainset = data.Subset(dataset, train_meta_idxs)
+    valset = data.Subset(dataset_val, val_idxs)
+    valset_noise = data.Subset(dataset_noise, val_idxs)
+
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=8)
+
+    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size,
+                                            shuffle=False, num_workers=8)
     
-    train_list = np.load('dataset_idxs/cifar100/train_idx.npy')
-    val_list = np.load('dataset_idxs/cifar100/val_idx.npy')
+    valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
+                                                  shuffle=False, num_workers=8)
 
-    trainset = data.Subset(dataset, train_list)
-    valset = data.Subset(dataset_val, val_list)
-    valset_noise = data.Subset(dataset_noise, val_list)
-
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
-    valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
-                                                  num_workers=8)
-    testset = datasets.CIFAR100(root='~/data/CIFAR100', train=False, download=False, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
-
-elif args.dataset == 'MNIST':
-
-    transform_train, transform_test = get_preprocessor(args.dataset)
+    testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False,
+                               transform=transform_test)
     
-    dataset = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_train)
-    dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
-    dataset_noise = datasets.MNIST(root='~/data/MNIST', train=True, download=False, transform=transform_noise)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False,
+                                             num_workers=8)
+
+# elif args.dataset == 'CIFAR100':
+
+#     transform_train, transform_test = get_preprocessor(args.dataset)
     
-    train_list = np.load('dataset_idxs/mnist/train_idx.npy')
-    val_list = np.load('dataset_idxs/mnist/val_idx.npy')
+#     dataset = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=True, transform=transform_train)
+#     dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
+#     dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
+    
+#     train_list = np.load('dataset_idxs/cifar100/train_idx.npy')
+#     val_list = np.load('dataset_idxs/cifar100/val_idx.npy')
 
-    trainset = data.Subset(dataset, train_list)
-    valset = data.Subset(dataset, val_list)
-    valset_noise = data.Subset(dataset_noise, val_list)
+#     trainset = data.Subset(dataset, train_list)
+#     valset = data.Subset(dataset_val, val_list)
+#     valset_noise = data.Subset(dataset_noise, val_list)
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
-    valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
-                                                  num_workers=8)
-    testset = datasets.MNIST(root='~/data/MNIST', train=False, download=False, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+#     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
+#     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
+#     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
+#                                                   num_workers=8)
+#     testset = datasets.CIFAR100(root='~/data/CIFAR100', train=False, download=False, transform=transform_test)
+#     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+
+# elif args.dataset == 'MNIST':
+
+#     transform_train, transform_test = get_preprocessor(args.dataset)
+    
+#     dataset = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_train)
+#     dataset_val = datasets.MNIST(root='~/data/MNIST', train=True, download=True, transform=transform_test)
+#     dataset_noise = datasets.MNIST(root='~/data/MNIST', train=True, download=False, transform=transform_noise)
+    
+#     train_list = np.load('dataset_idxs/mnist/train_idx.npy')
+#     val_list = np.load('dataset_idxs/mnist/val_idx.npy')
+
+#     trainset = data.Subset(dataset, train_list)
+#     valset = data.Subset(dataset, val_list)
+#     valset_noise = data.Subset(dataset_noise, val_list)
+
+#     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
+#     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
+#     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
+#                                                   num_workers=8)
+#     testset = datasets.MNIST(root='~/data/MNIST', train=False, download=False, transform=transform_test)
+#     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
 elif args.dataset == 'SVHN':
 
     transform_train, transform_test = get_preprocessor(args.dataset)
     
-    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True, transform=transform_train)
-    dataset_val = datasets.SVHN(root='~/data/SVHN', split='train', download=True, transform=transform_test)
-    dataset_noise = datasets.SVHN(root='~/data/SVHN', split='train', download=False, transform=transform_noise)
+    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
+                            transform=transform_test)
     
-    train_list = np.load('dataset_idxs/svhn/train_idx.npy')
-    val_list = np.load('dataset_idxs/svhn/val_idx.npy')
+    dataset_val = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
+                                transform=transform_test)
+    
+    dataset_noise = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
+                                  transform=transform_noise)
 
-    trainset = data.Subset(dataset, train_list)
-    valset = data.Subset(dataset, val_list)
-    valset_noise = data.Subset(dataset_noise, val_list)
+    # load indices used during our training
+    train_meta_idxs = np.load('trained-base-models/svhn-cnn/trainset_meta_idxs.npy')
+    val_idxs = np.load('trained-base-models/svhn-cnn/val_idxs.npy')
+
+    trainset = data.Subset(dataset, train_meta_idxs)
+    valset = data.Subset(dataset, val_idxs)
+    valset_noise = data.Subset(dataset_noise, val_idxs)
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
                                                   shuffle=False, num_workers=8)
     
-    testset = datasets.SVHN(root='~/data/SVHN', split='test', download=False, transform=transform_test)
+    testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
+                            transform=transform_test)
+    
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
+
+print(f'training on {len(trainset)} data samples.')
+print(f'validating on {len(valset)} data samples.')
+print(f'testing on {len(testset)} data samples')
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 '''
 Preparing model
 '''
-if args.dataset == 'CIFAR100':
-    base_net = models.__dict__[args.base_model](100)
-elif args.dataset == 'CIFAR10':
+# if args.dataset == 'CIFAR100':
+#     base_net = models.__dict__[args.base_model](100)
+# elif args.dataset == 'CIFAR10':
+#     base_net = models.__dict__[args.base_model](10)
+# else:
+#     base_net = models.__dict__[args.base_model]()
+
+# if args.dataset in ['CIFAR10', 'CIFAR100']:
+#     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
+#                                                 fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
+#                                                 fea_dim5=args.fea_dim[4], n_classes=args.fea_dim[5])
+# elif args.dataset == 'SVHN':
+#     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
+#                                                 fea_dim3=args.fea_dim[2])
+
+# else:
+#     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
+
+# get base net
+if args.dataset == 'CIFAR10':
     base_net = models.__dict__[args.base_model](10)
 else:
     base_net = models.__dict__[args.base_model]()
 
-if args.dataset in ['CIFAR10', 'CIFAR100']:
+
+# get meta net
+if args.dataset == 'CIFAR10' and args.base_model == 'ResNetWrapper':
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
                                                 fea_dim5=args.fea_dim[4], n_classes=args.fea_dim[5])
 elif args.dataset == 'SVHN':
     meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2])
-
-else:
-    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1])
 
 # transfer models to device
 if use_cuda:
@@ -211,8 +258,18 @@ if use_cuda:
 print("Base net is on device:", next(base_net.parameters()).device)
 print("Meta model is on device:", next(meta_net.parameters()).device)
 
+# FIXME: write resnet32 base-model / meta-model -- for probe placement
+# place after maxpooling layers
+
+# use models trained under our framework.
+if args.dataset == 'CIFAR10':
+  model_pth = os.path.join('trained-base-models', 'cifar10-resnet32', 'best.pth')
+
+elif args.dataset == 'SVHN':
+  model_pth = os.path.join('trained-base-models', 'svhn-cnn', 'best.pth')
+
 # Load base net state dictionary
-base_net.load_state_dict(checkpoint['net'])
+base_net.load_state_dict(torch.load(model_pth, map_location=device))
 base_net.eval()
 for k, v in base_net.named_parameters():
     v.requires_grad = False
@@ -281,60 +338,59 @@ def train(epoch):
     return (train_loss_final, acc)
 
 
-'''
-Testing Meta-model
-'''
+# '''
+# Testing Meta-model
+# '''
 
+# def test(epoch):
+#     global best_acc
+#     base_net.eval()
+#     meta_net.eval()
+#     test_loss = 0
+#     correct = 0
 
-def test(epoch):
-    global best_acc
-    base_net.eval()
-    meta_net.eval()
-    test_loss = 0
-    correct = 0
+#     total_entropy = 0
+#     max_prob = 0
+#     mutual_info = 0
+#     diff_entropy = 0
+#     precision = 0
 
-    total_entropy = 0
-    max_prob = 0
-    mutual_info = 0
-    diff_entropy = 0
-    precision = 0
+#     total = 0
+#     with torch.no_grad():
+#         for batch_idx, (xs, ys) in enumerate(testloader):
+#             total += ys.size(0)
+#             if use_cuda:
+#                 xs, ys = xs.cuda(), ys.cuda()
 
-    total = 0
-    with torch.no_grad():
-        for batch_idx, (xs, ys) in enumerate(testloader):
-            total += ys.size(0)
-            if use_cuda:
-                xs, ys = xs.cuda(), ys.cuda()
+#             logits, loss = compute_logits_and_loss(xs, ys, compute_loss=True)
+#             test_loss += loss.item()
+#             _, predicted = torch.max(logits.data, 1)
+#             correct += predicted.eq(ys.data).cpu().sum()
 
-            logits, loss = compute_logits_and_loss(xs, ys, compute_loss=True)
-            test_loss += loss.item()
-            _, predicted = torch.max(logits.data, 1)
-            correct += predicted.eq(ys.data).cpu().sum()
+#             # Uncertainty Criterion
+#             total_entropy += compute_total_entropy(logits).sum()
+#             max_prob += compute_max_prob(logits).sum()
+#             mutual_info += compute_mutual_information(logits).sum()
+#             diff_entropy += compute_differential_entropy(logits).sum()
+#             precision += compute_precision(logits).sum()
 
-            # Uncertainty Criterion
-            total_entropy += compute_total_entropy(logits).sum()
-            max_prob += compute_max_prob(logits).sum()
-            mutual_info += compute_mutual_information(logits).sum()
-            diff_entropy += compute_differential_entropy(logits).sum()
-            precision += compute_precision(logits).sum()
+#             if args.verbose:
+#                 progress_bar(batch_idx, len(testloader),
+#                              'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+#                              (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
+#                               diff_entropy/total, mutual_info / total,
+#                               total_entropy/total, max_prob/total, precision/total))
 
-            if args.verbose:
-                progress_bar(batch_idx, len(testloader),
-                             'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                             (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
-                              diff_entropy/total, mutual_info / total,
-                              total_entropy/total, max_prob/total, precision/total))
-
-        if not args.verbose:
-            print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-                  (test_loss/len(testloader), 100*correct/total, correct, total,
-                   diff_entropy/total, mutual_info/total,total_entropy/total,
-                   max_prob/total, precision/total))
+#         if not args.verbose:
+#             print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+#                   (test_loss/len(testloader), 100*correct/total, correct, total,
+#                    diff_entropy/total, mutual_info/total,total_entropy/total,
+#                    max_prob/total, precision/total))
             
-        test_loss_final = test_loss/total
-        acc = 100*correct/total
+#         test_loss_final = test_loss/total
+#         acc = 100*correct/total
 
-        return (test_loss_final, acc)
+#         return (test_loss_final, acc)
 
 
 '''
@@ -461,7 +517,7 @@ if __name__ == '__main__':
     time_start = time.perf_counter()
     for epoch in range(start_epoch, args.epoch + 1):
         train_loss, train_acc = train(epoch)
-        test_loss, test_acc = test(epoch)
+        # test_loss, test_acc = test(epoch)
         if args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
             OOD(epoch)
             UQ_validation()

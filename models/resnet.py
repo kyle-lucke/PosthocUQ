@@ -239,35 +239,82 @@ class ResNetWrapper(nn.Module):
   # re-define load_state_dict so pytorch does not complain about names
   def load_state_dict(self, state_dict):
       self.fe.load_state_dict(state_dict)
-       
+
+
 class Resnet_MetaModel_combine(nn.Module):
-  def __init__(self):
+  def __init__(self, fea_dim1, fea_dim2, fea_dim3, fea_dim4, fea_dim5, n_classes):
     super().__init__()
 
-    self.classifier3_fc1 = nn.Linear(8192, 4096)
-    self.classifier3_fc2 = nn.Linear(2048, 1024)
-    self.classifier3_fc3 = nn.Linear(512, 256)
-    self.classifier3_fc4 = nn.Linear(256, 10)
-
-    self.classifier3_fc1_second = nn.Linear(8192, 4096)
-    self.classifier3_fc2_second = nn.Linear(2048, 1024)
-    self.classifier3_fc3_second = nn.Linear(512, 256)
-    self.classifier3_fc4_second = nn.Linear(256, 10)
+    self.pooling = nn.MaxPool1d(kernel_size=2, stride=2)
     
-    self.classifier4_fc1 = nn.Linear(4096, 2048)
-    self.classifier4_fc2 = nn.Linear(1024, 512)
-    self.classifier4_fc3 = nn.Linear(256, 128)
-    self.classifier4_fc4 = nn.Linear(64, 10)
+    self.classifier3_fc1 = nn.Linear(4096, 2048)
+    self.classifier3_fc2 = nn.Linear(1024, 512)
+    self.classifier3_fc3 = nn.Linear(256, 128)
+    self.classifier3_fc4 = nn.Linear(64, n_classes)
 
-    self.classifier4_fc1_second = nn.Linear(4096, 2048)
-    self.classifier4_fc2_second = nn.Linear(1024, 512)
-    self.classifier4_fc3_second = nn.Linear(256, 128)
-    self.classifier4_fc4_second = nn.Linear(64, 10)
+    self.classifier3_fc1_second = nn.Linear(4096, 2048)
+    self.classifier3_fc2_second = nn.Linear(1024, 512)
+    self.classifier3_fc3_second = nn.Linear(256, 128)
+    self.classifier3_fc4_second = nn.Linear(64, n_classes)
+    
+    self.classifier4_fc1 = nn.Linear(2048, 1024)
+    self.classifier4_fc2 = nn.Linear(512, 256)
+    self.classifier4_fc3 = nn.Linear(128, 64)
+    self.classifier4_fc4 = nn.Linear(64, n_classes)
 
-    self.classifier5_fc1 = nn.Linear(64, 10)
+    self.classifier4_fc1_second = nn.Linear(2048, 1024)
+    self.classifier4_fc2_second = nn.Linear(512, 256)
+    self.classifier4_fc3_second = nn.Linear(128, 64)
+    self.classifier4_fc4_second = nn.Linear(64, n_classes)
 
-    self.classifier_final = nn.linear(5*10, 10)
+    self.classifier5_fc1 = nn.Linear(64, n_classes)
 
+    self.classifier_final = nn.Linear(5*n_classes, n_classes)
+
+  def forward(self, fea3, fea3_second, fea4, fea4_second, fea5):
+      
+    fea3 = self.pooling(fea3)
+    fea3 = F.relu(self.classifier3_fc1(fea3))
+    fea3 = self.pooling(fea3)
+    fea3 = F.relu(self.classifier3_fc2(fea3))
+    fea3 = self.pooling(fea3)
+    fea3 = F.relu(self.classifier3_fc3(fea3))
+    fea3 = self.pooling(fea3)
+    fea3 = F.relu(self.classifier3_fc4(fea3))
+
+    fea3_second = self.pooling(fea3_second)
+    fea3_second = F.relu(self.classifier3_fc1_second(fea3_second))
+    fea3_second = self.pooling(fea3_second)
+    fea3_second = F.relu(self.classifier3_fc2_second(fea3_second))
+    fea3_second = self.pooling(fea3_second)
+    fea3_second = F.relu(self.classifier3_fc3_second(fea3_second))
+    fea3_second = self.pooling(fea3_second)
+    fea3_second = F.relu(self.classifier3_fc4_second(fea3_second))
+
+    fea4 = self.pooling(fea4)
+    fea4 = F.relu(self.classifier4_fc1(fea4))
+    fea4 = self.pooling(fea4)
+    fea4 = F.relu(self.classifier4_fc2(fea4))
+    fea4 = self.pooling(fea4)
+    fea4 = F.relu(self.classifier4_fc3(fea4))
+    fea4 = F.relu(self.classifier4_fc4(fea4))
+
+    fea4_second = self.pooling(fea4_second)
+    fea4_second = F.relu(self.classifier4_fc1_second(fea4_second))
+    fea4_second = self.pooling(fea4_second)
+    fea4_second = F.relu(self.classifier4_fc2_second(fea4_second))
+    fea4_second = self.pooling(fea4_second)
+    fea4_second = F.relu(self.classifier4_fc3_second(fea4_second))
+    fea4_second = F.relu(self.classifier4_fc4_second(fea4_second))
+
+    fea5 = F.relu(self.classifier5_fc1(fea5))
+
+    fea = torch.cat((fea3, fea3_second, fea4, fea4_second, fea5), 1)
+    z = self.classifier_final(fea)
+
+    return z
+
+    
 def test(net):
     import numpy as np
     total_params = 0
