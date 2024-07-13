@@ -226,25 +226,20 @@ class ResNetWrapper(nn.Module):
   def __init__(self, num_classes):
     super().__init__()
       
-    resnet = resnet32(10)
-    resnet.eval()
-
+    resnet = resnet32(num_classes)
     self.fe = create_feature_extractor(resnet, resnet.dirichlet_return_nodes)
-    self.fe.eval()
-    
-    print(type(self.fe))
-    
+            
   def forward(self, x):
-      fe_res = {k: v.flatten(start_dim=1) for k, v in self.fe(x).items()}
+    fe_res = {k: v.flatten(start_dim=1) for k, v in self.fe(x).items()}
 
-      out = fe_res.pop('out')
+    out = fe_res.pop('out')
 
-      return out, list(fe_res.values())
-      
+    return out, list(fe_res.values())
+
+  # re-define load_state_dict so pytorch does not complain about names
   def load_state_dict(self, state_dict):
       self.fe.load_state_dict(state_dict)
-      
-      
+       
 class Resnet_MetaModel_combine(nn.Module):
   def __init__(self):
     super().__init__()
@@ -287,35 +282,17 @@ if __name__ == "__main__":
 
     import os
     
-    # resnet = resnet32(10)
-    # resnet.eval()
-    
-    # print(resnet)
-    # exit()
-    
-    # fe = create_feature_extractor(resnet, resnet.dirichlet_return_nodes)
-    # fe.eval()
-
     import torchvision.transforms as transforms
     import torchvision.datasets as datasets
 
-    
-    # inp = torch.rand(100, 3, 32, 32)
-
     model_pth = os.path.join('../trained-base-models', 'cifar10-resnet32', 'best.pth')
-
-    # wrapper = ResNetWrapper(10)
-    # wrapper.load_state_dict(torch.load(model_pth, map_location=torch.device('cpu')))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu' )
     
-    wrapper = resnet32(10)
+    wrapper = ResNetWrapper(10).to(device)
     wrapper.load_state_dict(torch.load(model_pth, map_location=device))
-
     wrapper.eval()
     
-    # out, lst = wrapper(inp)
-
     normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
                                      std=[0.2023, 0.1994, 0.2010])
     
@@ -324,6 +301,9 @@ if __name__ == "__main__":
       normalize
     ])
 
+    # for name, param in wrapper.named_parameters():
+    #     print(name, param.shape)
+    
     testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=True,
                                transform=transform_test)
     
@@ -332,12 +312,9 @@ if __name__ == "__main__":
     n_correct = 0.0
     n_total = 0.0
     for inp, lbl in testloader:
-      # pred, _ = wrapper(inp)
-      pred = wrapper(inp)
+      pred, _ = wrapper(inp)
       
-      pred_lbl = torch.argmax(pred)
-
-      print(pred_lbl.eq(lbl).sum())
+      pred_lbl = torch.argmax(pred, dim=-1)
       
       n_correct += pred_lbl.eq(lbl).sum()
       
@@ -345,10 +322,3 @@ if __name__ == "__main__":
 
     print(n_correct / n_total)
     
-    # for name, res in fe(inp).items():
-    #     print(name, res.flatten(start_dim=1).shape)
-    
-    # train_nodes, eval_nodes = get_graph_node_names(resnet32(10))
-
-    # for e in eval_nodes:
-    #     print(e)

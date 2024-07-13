@@ -143,25 +143,42 @@ class SmallConvNetSVHN_MetaModel_combine(nn.Module):
   
 if __name__ == '__main__':
 
-  torch.manual_seed(0)
-  r_data = torch.rand(128, 3, 32, 32)
+  import os
+    
+  import torchvision.transforms as transforms
+  import torchvision.datasets as datasets
 
+  model_pth = os.path.join('../trained-base-models', 'svhn-cnn', 'best.pth')
+
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu' )
+  
   model = SmallConvNetSVHN_BaseModel()
+  model.load_state_dict(torch.load(model_pth, map_location=device))
   model.eval()
-  
-  res1, ftrs = model(r_data)
-  res2, ftrs = model(r_data)
-  
-  for f in ftrs:
-    print(f.shape)
-  print()
-    
-  f1, f2, f3 = [f.shape[1] for f in ftrs]
-    
-  mm = SmallConvNetSVHN_MetaModel_combine(f1, f2, f3)
-  mm_res = mm(*ftrs)
 
-  print(mm_res.shape)
-  
-  print(torch.mean(res1 - res2))
-  print()
+  normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                   std=[0.5, 0.5, 0.5])
+
+  transform_test = transforms.Compose([
+    transforms.ToTensor(),
+    normalize
+  ])
+
+  testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
+                               transform=transform_test)
+    
+  testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False,
+                                           num_workers=8)
+
+  n_correct = 0.0
+  n_total = 0.0
+  for inp, lbl in testloader:
+    pred, _ = model(inp)
+      
+    pred_lbl = torch.argmax(pred, dim=-1)
+      
+    n_correct += pred_lbl.eq(lbl).sum()
+      
+    n_total += len(pred)
+
+  print(n_correct / n_total)
