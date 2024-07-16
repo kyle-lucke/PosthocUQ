@@ -64,11 +64,11 @@ class SmallConvNetMNIST_MetaModel_combine(nn.Module):
   def forward(self, x, y):
     # Meta Model
 
-    x = F.relu(self.classifier3_fc1(x))
+    x = F.relu(self.classifier1_fc1(x))
     x = self.pooling(x)
-    x = F.relu(self.classifier3_fc2(x))
-    x = F.relu(self.classifier3_fc3(x))
-    x = F.relu(self.classifier3_fc4(x))
+    x = F.relu(self.classifier1_fc2(x))
+    x = F.relu(self.classifier1_fc3(x))
+    x = F.relu(self.classifier1_fc4(x))
 
     y = F.relu(self.classifier2_fc1(y))
     y = self.pooling(y)
