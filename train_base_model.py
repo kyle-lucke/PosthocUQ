@@ -239,9 +239,8 @@ def test(epoch):
         print('Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss / len(valloader), 100. * correct / total, correct, total))
 
     acc = 100.*correct/total
-    if epoch == start_epoch + args.epoch - 1 or acc > best_acc:
-        checkpoint(acc, epoch)
     if acc > best_acc:
+        checkpoint(acc, epoch)
         best_acc = acc
 
     return (test_loss/batch_idx, 100.*correct/total)
