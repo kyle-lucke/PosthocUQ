@@ -5,7 +5,7 @@ def get_preprocessor(dataset):
   if dataset == 'MNIST':
 
     normalize = transforms.Normalize(mean=[0.1307,],
-                                 std=[0.3081,])
+                                     std=[0.3081,])
 
     transform_train = transforms.Compose([
       transforms.ToTensor(),
@@ -33,8 +33,8 @@ def get_preprocessor(dataset):
     
   elif dataset == 'CIFAR10':
 
-    normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
-                                     std=[0.2023, 0.1994, 0.2010])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     
     transform_train = transforms.Compose([
       transforms.RandomHorizontalFlip(),
@@ -49,8 +49,8 @@ def get_preprocessor(dataset):
     
   elif dataset == 'CIFAR100':
 
-    normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
-                                 std=[0.2023, 0.1994, 0.2010])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
     transform_train = transforms.Compose([
       transforms.RandomHorizontalFlip(),
