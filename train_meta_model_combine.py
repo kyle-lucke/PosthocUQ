@@ -152,7 +152,7 @@ if args.dataset == 'CIFAR10':
 
 elif args.dataset == 'SVHN':
 
-    transform_train, transform_test = get_preprocessor(args.dataset)
+    _ , transform_test = get_preprocessor(args.dataset)
     
     dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
                             transform=transform_test)
