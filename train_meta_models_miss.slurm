@@ -3,7 +3,7 @@
 # # Resource request
 #SBATCH -p gpu-mxian
 #SBATCH --gpus 1
-#SBATCH -o train_meta_models_miss_%j.out
+#SBATCH -o train_meta_models_miss.out
 
 # change directory to directory we submit job from:
 cd $SLURM_SUBMIT_DIR
@@ -16,12 +16,12 @@ conda activate torch
 # python train_meta_model_combine.py --base_model='SmallConvNetMNIST_BaseModel' --base_epoch=100 --meta_model='SmallConvNetMNIST_MetaModel_combine' --name='MNIST_miss' --dataset='MNIST' --lr=1e-1 --seed=0 --decay=5e-4 --epoch=50 --lambda_KL=1e-1 > mnist_meta_model.out
 # echo
 
-echo "CNN/SVHN"
-python train_meta_model_combine.py --base_model='SmallConvNetSVHN_BaseModel' --meta_model='SmallConvNetSVHN_MetaModel_combine' --name='SVHN_miss' --dataset='SVHN' --lr=1e-1 --seed=0 --decay=5e-4 --epoch=50 --lambda_KL=1e-1 > svhn_meta_model.out
-echo
+# echo "CNN/SVHN"
+# python train_meta_model_combine.py --base_model='SmallConvNetSVHN_BaseModel' --meta_model='SmallConvNetSVHN_MetaModel_combine' --name='SVHN_miss' --dataset='SVHN' --lr=1e-1 --seed=0 --decay=5e-4 --epoch=50 --lambda_KL=1e-1 > svhn_meta_model.out
+# echo
 
 echo "Resnet32/CIFAR10"
-python train_meta_model_combine.py --base_model='ResNetWrapper' --meta_model='Resnet_MetaModel_combine' --name='CIFAR10_miss' --dataset='CIFAR10' --lr=1e-4 --seed=0 --decay=5e-4 --epoch=50 --lambda_KL=1e-3 > cifar10_meta_model.out
+python train_meta_model_combine.py --base_model='ResNetWrapper' --meta_model='Resnet_MetaModel_combine' --name='CIFAR10_miss' --dataset='CIFAR10' --lr=1e-3 --seed=0 --decay=1e-4 --epoch=50 --lambda_KL=1e-3 > cifar10_meta_model.out
 echo
 
 
