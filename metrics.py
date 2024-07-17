@@ -1,7 +1,7 @@
 import torch
 
 # Note: meta model output is: g(\Phi(x); w_{g}) = log(\alpha(x))
-# \imples log(q(y = c | \Phi(x); w_{g})) = log(\alpha_{c}(x)) - log(\alpha_{0})
+# \implies log(q(y = c | \Phi(x); w_{g})) = log(\alpha_{c}(x)) - log(\alpha_{0})
 # = log(\alpha_{c}(x)) - log(\sum_{i=1}^{k} \alpha_{i}(x))
 
 # Standard entropy loss
