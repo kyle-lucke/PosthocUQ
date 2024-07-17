@@ -235,45 +235,24 @@ def ROC_OOD(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision, all_label,
            [auroc_base_Ent * 100, auroc_base_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
 
 
-def ROC_Selective(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision,
-                  base_Ent, base_MaxP,
-                  Base_predicted, Meta_predicted):
+def ROC_Selective(Ent, MaxP, Meta_predicted):
+
     print('Misclssification Detection!')
     Meta_predicted = Meta_predicted.int()
-    Base_predicted = Base_predicted.int()
-    print(Meta_predicted.sum())
-    print(Base_predicted.sum())
-    auroc_Dent = metrics.roc_auc_score(Meta_predicted.numpy(), ood_Dent.numpy())
-    auroc_MI = metrics.roc_auc_score(Meta_predicted.numpy(), ood_MI.numpy())
-    auroc_Ent = metrics.roc_auc_score(Meta_predicted.numpy(), ood_Ent.numpy())
-    auroc_MaxP = metrics.roc_auc_score(Meta_predicted.numpy(), 1 - ood_MaxP.numpy())
-    auroc_precision = metrics.roc_auc_score(Meta_predicted.numpy(), -ood_precision.numpy())
-    auroc_base_Ent = metrics.roc_auc_score(Base_predicted.numpy(), base_Ent.numpy())
-    auroc_base_MaxP = metrics.roc_auc_score(Base_predicted.numpy(), 1 - base_MaxP.numpy())
 
-    print('AUROC score of Total Entropy is', auroc_Ent)
-    print('AUROC score of MaxP is', auroc_MaxP)
+    auroc_Ent = metrics.roc_auc_score(Meta_predicted.numpy(), Ent.numpy())
+    auroc_MaxP = metrics.roc_auc_score(Meta_predicted.numpy(), 1 - MaxP.numpy())
 
-    print('AUROC score of Base Model Total Entropy is', auroc_base_Ent)
-    print('AUROC score of Base Model MaxP is', auroc_base_MaxP)
-
-    aupr_Dent = metrics.average_precision_score(Meta_predicted.numpy(), ood_Dent.numpy())
-    aupr_MI = metrics.average_precision_score(Meta_predicted.numpy(), ood_MI.numpy())
-    aupr_Ent = metrics.average_precision_score(Meta_predicted.numpy(), ood_Ent.numpy())
-    aupr_MaxP = metrics.average_precision_score(Meta_predicted.numpy(), 1 - ood_MaxP.numpy())
-    aupr_precision = metrics.average_precision_score(Meta_predicted.numpy(), -ood_precision.numpy())
-    aupr_base_Ent = metrics.average_precision_score(Base_predicted.numpy(), base_Ent.numpy())
-    aupr_base_MaxP = metrics.average_precision_score(Base_predicted.numpy(), 1 - base_MaxP.numpy())
+    # TODO: use validation data to compute threshold over max P for sensitivity/specificity, 
     
-    print('AUPR score of Total Entropy is', aupr_Ent)
-    print('AUPR score of MaxP is', aupr_MaxP)
+    aupr_Ent = metrics.average_precision_score(Meta_predicted.numpy(), Ent.numpy())
+    aupr_MaxP = metrics.average_precision_score(Meta_predicted.numpy(), 1 - MaxP.numpy())
     
-    print('AUPR score of Base Model Total Entropy is', aupr_base_Ent)
-    print('AUPR score of Base Model MaxP is', aupr_base_MaxP)
-
-    return [auroc_Ent * 100, auroc_MaxP * 100, aupr_Ent * 100, aupr_MaxP * 100,
-            auroc_base_Ent * 100, auroc_base_MaxP * 100, aupr_base_Ent * 100,
-            aupr_base_MaxP * 100]
+    return dict(auroc_ent=auroc_Ent,
+                auroc_maxp=auroc_MaxP,
+                
+                aupr_ent=aupr_Ent,
+                aupr_maxp=aupr_MaxP)
 
 
 def convert_to_rgb(x):
