@@ -39,7 +39,7 @@ parser.add_argument('--name', default='CIFAR100_OOD', choices=('CIFAR10_miss', '
 
 
 parser.add_argument('--dataset', default='CIFAR10', choices=('CIFAR10', 'SVHN'), type=str, help='Dataset to use for run')
-parser.add_argument('--seed', default=1, type=int, help='random seed')
+parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
 parser.add_argument('--no-augment', dest='augment', action='store_false',
@@ -52,7 +52,8 @@ args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
-# best_acc = 0  # best test accuracy
+args.augment = False
+
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 best_auroc = 0
 
@@ -121,33 +122,11 @@ if args.dataset == 'CIFAR10':
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
                                                   shuffle=False, num_workers=8)
 
-    testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False,
-                               transform=transform_test)
+    # testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False,
+    #                            transform=transform_test)
     
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False,
-                                             num_workers=8)
-
-# elif args.dataset == 'CIFAR100':
-
-#     transform_train, transform_test = get_preprocessor(args.dataset)
-    
-#     dataset = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=True, transform=transform_train)
-#     dataset_val = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_test)
-#     dataset_noise = datasets.CIFAR100(root='~/data/CIFAR100', train=True, download=False, transform=transform_noise)
-    
-#     train_list = np.load('dataset_idxs/cifar100/train_idx.npy')
-#     val_list = np.load('dataset_idxs/cifar100/val_idx.npy')
-
-#     trainset = data.Subset(dataset, train_list)
-#     valset = data.Subset(dataset_val, val_list)
-#     valset_noise = data.Subset(dataset_noise, val_list)
-
-#     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-#     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
-#     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size, shuffle=False,
-#                                                   num_workers=8)
-#     testset = datasets.CIFAR100(root='~/data/CIFAR100', train=False, download=False, transform=transform_test)
-#     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False,
+    #                                          num_workers=8)
 
 # elif args.dataset == 'MNIST':
 
@@ -197,15 +176,15 @@ elif args.dataset == 'SVHN':
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
                                                   shuffle=False, num_workers=8)
     
-    testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
-                            transform=transform_test)
+    # testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
+    #                         transform=transform_test)
     
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
 
 print(f'training on {len(trainset)} data samples.')
 print(f'validating on {len(valset)} data samples.')
-print(f'testing on {len(testset)} data samples')
+# print(f'testing on {len(testset)} data samples')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -329,7 +308,7 @@ def train(epoch):
                          (train_loss/(batch_idx + 1), 100*correct/total, correct, total))
 
     if not args.verbose:
-      print('Loss: %.3f |  Acc: %.3f%% (%d/%d)' %
+      print('Train | Loss: %.3f |  Acc: %.3f%% (%d/%d)' %
             (train_loss/len(trainloader), 100*correct/total, correct, total))
 
     train_loss_final = train_loss/batch_idx
@@ -342,55 +321,55 @@ def train(epoch):
 # Testing Meta-model
 # '''
 
-# def test(epoch):
-#     global best_acc
-#     base_net.eval()
-#     meta_net.eval()
-#     test_loss = 0
-#     correct = 0
+def validate(epoch):
 
-#     total_entropy = 0
-#     max_prob = 0
-#     mutual_info = 0
-#     diff_entropy = 0
-#     precision = 0
+    base_net.eval()
+    meta_net.eval()
+    valid_loss = 0
+    correct = 0
 
-#     total = 0
-#     with torch.no_grad():
-#         for batch_idx, (xs, ys) in enumerate(testloader):
-#             total += ys.size(0)
-#             if use_cuda:
-#                 xs, ys = xs.cuda(), ys.cuda()
+    total_entropy = 0
+    max_prob = 0
+    mutual_info = 0
+    diff_entropy = 0
+    precision = 0
 
-#             logits, loss = compute_logits_and_loss(xs, ys, compute_loss=True)
-#             test_loss += loss.item()
-#             _, predicted = torch.max(logits.data, 1)
-#             correct += predicted.eq(ys.data).cpu().sum()
+    total = 0
+    with torch.no_grad():
+        for batch_idx, (xs, ys) in enumerate(valloader):
+            total += ys.size(0)
+            if use_cuda:
+                xs, ys = xs.cuda(), ys.cuda()
 
-#             # Uncertainty Criterion
-#             total_entropy += compute_total_entropy(logits).sum()
-#             max_prob += compute_max_prob(logits).sum()
-#             mutual_info += compute_mutual_information(logits).sum()
-#             diff_entropy += compute_differential_entropy(logits).sum()
-#             precision += compute_precision(logits).sum()
+            logits, loss = compute_logits_and_loss(xs, ys, compute_loss=True)
+            valid_loss += loss.item()
+            _, predicted = torch.max(logits.data, 1)
+            correct += predicted.eq(ys.data).cpu().sum()
 
-#             if args.verbose:
-#                 progress_bar(batch_idx, len(testloader),
-#                              'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-#                              (test_loss/(batch_idx + 1), 100*correct/total, correct, total,
-#                               diff_entropy/total, mutual_info / total,
-#                               total_entropy/total, max_prob/total, precision/total))
+            # Uncertainty Criterion
+            total_entropy += compute_total_entropy(logits).sum()
+            max_prob += compute_max_prob(logits).sum()
+            mutual_info += compute_mutual_information(logits).sum()
+            diff_entropy += compute_differential_entropy(logits).sum()
+            precision += compute_precision(logits).sum()
 
-#         if not args.verbose:
-#             print('Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
-#                   (test_loss/len(testloader), 100*correct/total, correct, total,
-#                    diff_entropy/total, mutual_info/total,total_entropy/total,
-#                    max_prob/total, precision/total))
+            if args.verbose:
+                progress_bar(batch_idx, len(valloader),
+                             'Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                             (valid_loss/(batch_idx + 1), 100*correct/total, correct, total,
+                              diff_entropy/total, mutual_info / total,
+                              total_entropy/total, max_prob/total, precision/total))
+
+        if not args.verbose:
+            print('Valid Metrics | Loss: %.3f | Acc: %.3f%% (%d/%d) | DEnt: %.3f | MI: %.3f | TotEnt: %.3f | MaxP: %.3f | Prec: %.3f' %
+                  (valid_loss/len(valloader), 100*correct/total, correct, total,
+                   diff_entropy/total, mutual_info/total,total_entropy/total,
+                   max_prob/total, precision/total))
             
-#         test_loss_final = test_loss/total
-#         acc = 100*correct/total
+        valid_loss_final = valid_loss/total
+        acc = 100*correct/total
 
-#         return (test_loss_final, acc)
+        return (valid_loss_final, acc)
 
 
 '''
@@ -497,7 +476,7 @@ def checkpoint(auroc, epoch):
     }
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    torch.save(state, f'./checkpoint/ckpt.t7{args.name}_{args.meta_model}_{args.seed}')
+    torch.save(state, f'./checkpoint/{args.name}_{args.meta_model}_{args.seed}.ckpt')
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -514,18 +493,28 @@ def adjust_learning_rate(optimizer, epoch):
 Main training process
 '''
 if __name__ == '__main__':
+
+    best_loss = float('inf')
+    
     time_start = time.perf_counter()
     for epoch in range(start_epoch, args.epoch + 1):
         train_loss, train_acc = train(epoch)
-        # test_loss, test_acc = test(epoch)
+        valid_loss, valid_acc = validate(epoch)
         if args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
             OOD(epoch)
             UQ_validation()
             adjust_learning_rate(optimizer, epoch)
 
+        if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss', 'SVHN_miss']:
+
+            if valid_loss < best_loss:
+              print(f'Validation loss improved from {best_loss:.4e} to {valid_loss:.4e}')  
+
+              checkpoint(0, args.epoch)
+
+              best_loss = valid_loss
+            
     print('Finished')
     training_time = time.perf_counter() - time_start
     print('Total training time', str(training_time) + ' seconds')
 
-    if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss', 'SVHN_miss']:
-        checkpoint(0, args.epoch)
