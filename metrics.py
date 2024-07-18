@@ -1,5 +1,7 @@
 import torch
 
+import numpy as np
+
 # Note: meta model output is: g(\Phi(x); w_{g}) = log(\alpha(x))
 # \implies log(q(y = c | \Phi(x); w_{g})) = log(\alpha_{c}(x)) - log(\alpha_{0})
 # = log(\alpha_{c}(x)) - log(\sum_{i=1}^{k} \alpha_{i}(x))
@@ -61,3 +63,30 @@ def compute_data_uncertainty(log_alphas):
                      torch.digamma(alpha0 + 1).unsqueeze(-1)),
         1)
     return loss
+
+def threshold(preds, tau):
+    if isinstance(preds, np.ndarray):
+        return np.where(preds>tau, 1.0, 0.0)
+
+    elif torch.is_tensor(preds):
+        return torch.where(preds>tau, 1.0, 0.0)
+
+    else:
+        raise TypeError(f"ERROR: preds is expected to be of type (torch.tensor, numpy.ndarray) but is type {type(preds)}")
+
+# also known as recall or true positive rate (TPR)
+def sensitivity(tp, fn):
+    return tp / (tp + fn)
+
+# Also known as selectivity, or true negative rate (TNR)
+def specificity(tn, fp):
+    return tn / (tn + fp)
+
+# beta > 1 gives more weight to specificity, while beta < 1 favors
+# sensitivity. For example, beta = 2 makes specificity twice as important as
+# sensitivity, while beta = 0.5 does the opposite.
+def f_score_sens_spec(sens, spec, beta=1.0):
+
+    # return (1 + beta**2) * ( (precision * recall) / ( (beta**2 * precision) + recall ) )
+
+    return (1 + beta**2) * ( (sens * spec) / ( (beta**2 * sens) + spec ) )

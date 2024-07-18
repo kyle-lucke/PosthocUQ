@@ -14,6 +14,8 @@ from torch.distributions import MultivariateNormal, Normal
 from torch.distributions.distribution import Distribution
 import matplotlib.pyplot as plt
 
+from metrics import *
+
 def plot_auc_curve(labels, scores):
 
     if isinstance(labels, torch.Tensor):
@@ -235,29 +237,43 @@ def ROC_OOD(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision, all_label,
            [auroc_base_Ent * 100, auroc_base_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
 
 
-def ROC_Selective(Ent, MaxP, Meta_predicted):
+def ROC_Selective(Ent, MaxP, Meta_predicted, tau):
 
+    scores = {}
+
+    scores['threshold'] = tau
+    
     print('Misclssification Detection!')
     Meta_predicted = Meta_predicted.int()
 
-    auroc_Ent = metrics.roc_auc_score(Meta_predicted.numpy(), Ent.numpy())
-    auroc_MaxP = metrics.roc_auc_score(Meta_predicted.numpy(), 1 - MaxP.numpy())
+    scores['auroc_ent'] = metrics.roc_auc_score(Meta_predicted.numpy(), -Ent.numpy())
+    scores['auroc_maxp'] = metrics.roc_auc_score(Meta_predicted.numpy(), MaxP.numpy())
 
-    # TODO: use validation data to compute threshold over max P for sensitivity/specificity, 
+    misclf_labels = Meta_predicted.int().detach().cpu().numpy()
+    max_p = MaxP.detach().cpu().numpy()
     
-    aupr_Ent = metrics.average_precision_score(Meta_predicted.numpy(), Ent.numpy())
-    aupr_MaxP = metrics.average_precision_score(Meta_predicted.numpy(), 1 - MaxP.numpy())
-    
-    return dict(auroc_ent=auroc_Ent,
-                auroc_maxp=auroc_MaxP,
-                
-                aupr_ent=aupr_Ent,
-                aupr_maxp=aupr_MaxP)
+    predicted_labels = threshold(max_p, tau)
 
+    tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels, predicted_labels).ravel()
+        
+    specificity_value = specificity(tn, fp)
+    sensitivity_value = sensitivity(tp, fn)
+    
+    for beta in [1.0, 2.0]:
+
+        scores[f'f_beta_spec_sense@{beta}'] = f_score_sens_spec(sensitivity_value,
+                                                                specificity_value, beta=beta)
+
+    scores['specificity'] = specificity_value
+    scores['sensitivity'] = sensitivity_value
+        
+    scores['aupr_ent'] = metrics.average_precision_score(Meta_predicted.numpy(), -Ent.numpy())
+    scores['aupr_maxp'] = metrics.average_precision_score(Meta_predicted.numpy(), MaxP.numpy())
+    
+    return scores
 
 def convert_to_rgb(x):
     return x.convert("RGB")
-
 
 # Reference: https://discuss.pytorch.org/t/kernel-density-estimation-as-loss-function/62261/8
 class GaussianKDE(Distribution):

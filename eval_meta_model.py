@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import csv
+import json
 import random
 import argparse
 
@@ -11,39 +12,54 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+from sklearn import metrics
 
 import dataloaders as loaders
 import models
 import preproc as pre
-from metrics import compute_total_entropy, compute_max_prob, compute_differential_entropy, compute_mutual_information, compute_precision
+from metrics import *
+
+from model_utils import get_preprocessor
 
 from utils import ROC_OOD, ROC_Selective, convert_to_rgb, set_seed
 
 parser = argparse.ArgumentParser(description='Meta model Evaluation')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
-parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-parser.add_argument('--base_model', default="VGG16_BaseModel", type=str, help='model type (default: LeNet)')
-parser.add_argument('--base_epoch', default=200, type=int, help='total epochs to train base model')
-parser.add_argument('--meta_model', default="VGG16_MetaModel_combine", type=str, help='model type (default: LeNet)')
-parser.add_argument('--fea_dim', default=[16384, 8192, 4096, 2048, 512])
-parser.add_argument('--name', default='CIFAR10_OOD', type=str, help='name of run')
-parser.add_argument('--dataset', default='CIFAR10', type=str, help='name of run')
+
+
+parser.add_argument('--base_model', default="WideResNet_BaseModel",
+                    choices=('SmallConvNetSVHN_BaseModel', 'ResNetWrapper'),
+                    type=str, help='model type (default: LeNet)')
+
+parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type=str,
+                    choices=('SmallConvNetSVHN_MetaModel_combine', 'Resnet_MetaModel_combine'),
+                    help='model type (default: LeNet)')
+
+parser.add_argument('--name', default='CIFAR100_OOD', choices=('CIFAR10_miss', 'SVHN_miss'),
+                    type=str, help='name of run')
+
+parser.add_argument('--dataset', default='CIFAR10', choices=('CIFAR10', 'SVHN'), type=str,
+                    help='Dataset to use for run')
+
 parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
-parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
-parser.add_argument('--no-augment', dest='augment', action='store_false',
-                    help='use standard augmentation (default: True)')
-parser.add_argument('--decay', default=5e-4, type=float, help='weight decay')
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
-if args.dataset == 'MNIST':
-    args.fea_dim = [6 * 14 * 14, 5 * 5 * 16]
-else:
-    args.fea_dim = [16384, 8192, 4096, 2048, 512]
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+if args.dataset == 'SVHN':
+    args.fea_dim = [8192, 4096, 2048]
+# elif args.dataset == 'MNIST':
+#     args.fea_dim = [5408, 9216]
+# elif args.dataset == 'CIFAR10' and args.base_model == 'VGG16_BaseModel':
+#     args.fea_dim = [16384, 8192, 4096, 2048, 512, 10]
+elif args.dataset == 'CIFAR10' and args.base_model == 'ResNetWrapper':
+    args.fea_dim = [8192, 8192, 4096, 4096, 64, 10]    
+# elif args.dataset == 'CIFAR100':
+#     args.fea_dim = [16384, 8192, 4096, 2048, 512, 100]
 
 set_seed(args.seed, use_cuda)
 
@@ -77,6 +93,17 @@ if args.dataset == 'CIFAR10':
     print('CIFAR10')
 
     _, transform_test = get_preprocessor(args.dataset)
+
+    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
+                            transform=transform_test)
+
+    val_idxs = np.load('trained-base-models/cifar10-resnet32/val_idxs.npy')
+
+    valset = data.Subset(dataset_val, val_idxs)
+
+    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size,
+                                            shuffle=False, num_workers=8)
+
     
     testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False,
                                transform=transform_test)
@@ -88,6 +115,16 @@ elif args.dataset == 'SVHN':
 
     _, transform_test = get_preprocessor(args.dataset)
 
+    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
+                            transform=transform_test)
+    
+    val_idxs = np.load('trained-base-models/svhn-cnn/val_idxs.npy')
+
+    valset = data.Subset(dataset, val_idxs)
+
+    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False,
+                                            num_workers=8)
+    
     testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
                             transform=transform_test)
     
@@ -145,7 +182,7 @@ elif args.dataset == 'SVHN':
 # Load base model and meta model
 checkpoint_base = torch.load(checkpoint_base, map_location=device)
 
-checkpoint_meta = torch.load(f'./checkpoint/{args.name}_{args.meta_model}_{args.seed}.ckpt',
+checkpoint_meta = torch.load(f'checkpoint/{args.name}_{args.meta_model}_{args.seed}.ckpt',
                              map_location=device)
 
 # get base net
@@ -160,15 +197,20 @@ base_net.eval()
 
 # get meta net
 if args.dataset == 'CIFAR10' and args.base_model == 'ResNetWrapper':
-    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
-                                                fea_dim3=args.fea_dim[2], fea_dim4=args.fea_dim[3],
-                                                fea_dim5=args.fea_dim[4], n_classes=args.fea_dim[5])
+    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0],
+                                                fea_dim2=args.fea_dim[1],
+                                                fea_dim3=args.fea_dim[2],
+                                                fea_dim4=args.fea_dim[3],
+                                                fea_dim5=args.fea_dim[4],
+                                                n_classes=args.fea_dim[5])
 elif args.dataset == 'SVHN':
-    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0], fea_dim2=args.fea_dim[1],
+    meta_net = models.__dict__[args.meta_model](fea_dim1=args.fea_dim[0],
+                                                fea_dim2=args.fea_dim[1],
                                                 fea_dim3=args.fea_dim[2])
 
 meta_net.load_state_dict(checkpoint_meta['meta_net'])
 meta_net.eval()
+
 
 # transfer models to gpu if applicable    
 if use_cuda:
@@ -178,7 +220,7 @@ if use_cuda:
 
 print("Base net is on device:", next(base_net.parameters()).device)
 print("Meta model is on device:", next(meta_net.parameters()).device)
-    
+
 # Collect all uncertainty scores
 def get_uncertainty_score(loader, label, get_preds=False):
     assert label in [0, 1]
@@ -215,11 +257,16 @@ def get_uncertainty_score(loader, label, get_preds=False):
                 _, base_predicted = torch.max(base_logits.data, 1)
                 base_wrongs = base_predicted.ne(ys.data)
                 _, meta_predicted = torch.max(logits.data, 1)
-                meta_wrongs = meta_predicted.ne(ys.data)
+
+                # meta_wrongs = meta_predicted.ne(ys.data)
+                meta_correct = meta_predicted.eq(ys.data)
 
                 base_preds.append(base_wrongs.data.cpu())
-                preds.append(meta_wrongs.data.cpu())
+                
+                # preds.append(meta_wrongs.data.cpu())
+                preds.append(meta_correct.data.cpu())
 
+                
             # Uncertainty Criterion
             labels.append(label * torch.ones(ys.shape[0]))
 
@@ -247,6 +294,59 @@ def get_uncertainty_score(loader, label, get_preds=False):
                base_preds, preds
 
 
+def determine_threshold(max_threshold_step=.01):
+
+    # NOTE: the actual threhsold step may be slightly lower than
+    # max_threshold_step due to roundoff
+    
+    _, _, _, max_p, _, _, _, _, _, _, meta_preds = get_uncertainty_score(valloader,
+                                                                         label=0, get_preds=True)
+
+    misclf_labels = meta_preds.int().detach().cpu().numpy()
+    max_p = max_p.detach().cpu().numpy()
+
+    # determine how many elements we need for a pre-determined spacing
+    # between thresholds. taken from:
+    # https://stackoverflow.com/a/70230433
+    num = round((max_p.max() - max_p.min()) / max_threshold_step) + 1 
+    thresholds = np.linspace(max_p.min(), max_p.max(), num, endpoint=True)
+
+    # compute performance over thresholds
+    threshold_to_metric = {}
+    for tau in thresholds:
+
+        predicted_labels = threshold(max_p, tau)
+
+        tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels, predicted_labels).ravel()
+        
+        specificity_value = specificity(tn, fp)
+        sensitivity_value = sensitivity(tp, fn)
+
+        f_beta_spec_sens = f_score_sens_spec(sensitivity_value,
+                                             specificity_value, beta=1.0)
+
+        # print(f'tau: {tau}, spec: {specificity_value}, sens: {sensitivity_value}, f_beta: {f_beta_spec_sens}')
+        
+        threshold_to_metric[tau] = f_beta_spec_sens
+
+        
+    # print('threshold: f_beta_spec_sens')
+    # for t, val in threshold_to_metric.items():
+    #     print(f'{t}: {val}')
+    # print(end='\n\n')
+
+    # determine best threshold:
+    best_item = max(threshold_to_metric.items(), key=lambda x: x[1])
+
+    # print(best_item)
+
+    return best_item[0]
+    
+threshold = determine_threshold()
+
+print(f'selected threshold: {threshold}')
+print()
+
 diff_ents, mis, ents, maxps, precs, labels, base_ents, base_maxps, base_energy, base_preds, meta_preds = \
     get_uncertainty_score(testloader, label=0, get_preds=True)
 
@@ -256,31 +356,22 @@ if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
 # evaluation
-if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss']:
-
-    # use validation data to compute threshold over maxP for sens/spec calculation
-    
+if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss', 'SVHN_miss']:
     
     # Evaluate misclassification performance (for test dataset)
-    res = ROC_Selective(ents, maxps, meta_preds)
-
-    auroc_ent = res['auroc_ent']
-    auroc_maxp = res['auroc_maxp']
-
-    aupr_ent = res['aupr_ent']
-    aupr_maxp = res['aupr_maxp']
-
+    res = ROC_Selective(ents, maxps, meta_preds, threshold)
+    
+    for k, v in res.items():
+        print(f'{k}: {v:.4f}')
+    
     # save results:
-    log_name = os.path.join(out_dir, f'misclassification.csv')
-
-    with open(log_name, 'w') as logfile:
-        logwriter = csv.writer(logfile, delimiter=',')
-        
-        logwriter.writerow(['AUROC ENT', 'AUROC MAXP', 'AUPR ENT', 'AUPR MAXP'])    
-        logwriter.writerow([auroc_ent, auroc_maxp, aupr_ent, aupr_maxp])
+    json.dump(res, open(os.path.join(out_dir, 'test_metrics.json'), 'w'))
         
 # elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
-    
+
+#     print('FIXME: NEED TO CHANGE LABEL VALUES/METRIC VALUES FOR OOD)
+#     exit()
+
 #     for i in range(len(oodloaders)):
 #         print(oodnames[i])
 #         ood_diff_ents, ood_mis, ood_ents, ood_maxps, ood_precs, ood_labels, \

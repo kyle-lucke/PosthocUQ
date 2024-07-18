@@ -25,10 +25,10 @@ from model_utils import *
 parser = argparse.ArgumentParser(description='Meta model training')
 parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
 parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
+
 parser.add_argument('--base_model', default="WideResNet_BaseModel",
                     choices=('SmallConvNetSVHN_BaseModel', 'ResNetWrapper'),
                     type=str, help='model type (default: LeNet)')
-# parser.add_argument('--base_epoch', default=200, type=int, help='total epochs base model was trained for')
 
 parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type=str,
                     choices=('SmallConvNetSVHN_MetaModel_combine', 'Resnet_MetaModel_combine'),
@@ -37,8 +37,9 @@ parser.add_argument('--meta_model', default="WideResNet_MetaModel_combine", type
 parser.add_argument('--name', default='CIFAR100_OOD', choices=('CIFAR10_miss', 'SVHN_miss'),
                     type=str, help='name of run')
 
+parser.add_argument('--dataset', default='CIFAR10', choices=('CIFAR10', 'SVHN'), type=str,
+                    help='Dataset to use for run')
 
-parser.add_argument('--dataset', default='CIFAR10', choices=('CIFAR10', 'SVHN'), type=str, help='Dataset to use for run')
 parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--batch-size', default=128, type=int, help='batch size')
 parser.add_argument('--epoch', default=20, type=int, help='total epochs to run')
@@ -122,11 +123,6 @@ if args.dataset == 'CIFAR10':
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
                                                   shuffle=False, num_workers=8)
 
-    # testset = datasets.CIFAR10(root='~/data/CIFAR10', train=False, download=False,
-    #                            transform=transform_test)
-    
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False,
-    #                                          num_workers=8)
 
 # elif args.dataset == 'MNIST':
 
@@ -150,6 +146,7 @@ if args.dataset == 'CIFAR10':
 #     testset = datasets.MNIST(root='~/data/MNIST', train=False, download=False, transform=transform_test)
 #     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
+
 elif args.dataset == 'SVHN':
 
     _ , transform_test = get_preprocessor(args.dataset)
@@ -171,20 +168,18 @@ elif args.dataset == 'SVHN':
     valset = data.Subset(dataset, val_idxs)
     valset_noise = data.Subset(dataset_noise, val_idxs)
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=8)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True,
+                                              num_workers=8)
+    
+    valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False,
+                                            num_workers=8)
+    
     valloader_noise = torch.utils.data.DataLoader(valset_noise, batch_size=args.batch_size,
                                                   shuffle=False, num_workers=8)
-    
-    # testset = datasets.SVHN(root='~/data/SVHN', split='test', download=True,
-    #                         transform=transform_test)
-    
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=8)
 
 
 print(f'training on {len(trainset)} data samples.')
 print(f'validating on {len(valset)} data samples.')
-# print(f'testing on {len(testset)} data samples')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
