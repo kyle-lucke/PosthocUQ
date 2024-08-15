@@ -99,7 +99,7 @@ if args.dataset == 'CIFAR10':
 
     val_idxs = np.load('trained-base-models/cifar10-resnet32/val_idxs.npy')
 
-    valset = data.Subset(dataset_val, val_idxs)
+    valset = data.Subset(dataset, val_idxs)
 
     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size,
                                             shuffle=False, num_workers=8)
@@ -240,6 +240,8 @@ def get_uncertainty_score(loader, label, get_preds=False):
     maxps = []
     precs = []
 
+    misclf_labels_all = []
+    
     base_preds = []
     preds = []
 
@@ -256,6 +258,10 @@ def get_uncertainty_score(loader, label, get_preds=False):
                 # Get predictions (misclassification binary labels)
                 _, base_predicted = torch.max(base_logits.data, 1)
                 base_wrongs = base_predicted.ne(ys.data)
+
+                misclf_labels_correct = base_predicted == ys 
+                misclf_labels_errors = base_predicted != ys 
+                
                 _, meta_predicted = torch.max(logits.data, 1)
 
                 # meta_wrongs = meta_predicted.ne(ys.data)
@@ -280,6 +286,9 @@ def get_uncertainty_score(loader, label, get_preds=False):
             maxps.append(compute_max_prob(logits).data.cpu())
             precs.append(compute_precision(logits).data.cpu())
 
+            misclf_labels_correct_all.append(misclf_labels_correct)
+            misclf_label_error_all.append(misclf_labels_errors)
+            
         if get_preds:
             base_preds = torch.cat(base_preds, 0)
             preds = torch.cat(preds, 0)
@@ -294,7 +303,7 @@ def get_uncertainty_score(loader, label, get_preds=False):
                base_preds, preds
 
 
-def determine_threshold(max_threshold_step=.01):
+def determine_threshold(max_threshold_step=0.01):
 
     # NOTE: the actual threhsold step may be slightly lower than
     # max_threshold_step due to roundoff
