@@ -237,25 +237,24 @@ def ROC_OOD(ood_Dent, ood_MI, ood_Ent, ood_MaxP, ood_precision, all_label,
            [auroc_base_Ent * 100, auroc_base_MaxP * 100, aupr_base_Ent * 100, aupr_base_MaxP * 100]
 
 
-def ROC_Selective(Ent, MaxP, Meta_predicted, tau):
+def ROC_Selective(MaxP, misclf_labels_correct, misclf_labels_error, tau):
 
     scores = {}
 
     scores['threshold'] = tau
     
     print('Misclssification Detection!')
-    Meta_predicted = Meta_predicted.int()
-
-    scores['auroc_ent'] = metrics.roc_auc_score(Meta_predicted.numpy(), -Ent.numpy())
-    scores['auroc_maxp'] = metrics.roc_auc_score(Meta_predicted.numpy(), MaxP.numpy())
-
-    misclf_labels = Meta_predicted.int().detach().cpu().numpy()
+    misclf_labels_correct = misclf_labels_correct.int().detach().cpu().numpy()
+    misclf_labels_error = misclf_labels_error.int().detach().cpu().numpy()
+    
     max_p = MaxP.detach().cpu().numpy()
+
+    scores['roc_auc'] = metrics.roc_auc_score(misclf_labels_correct, max_p)
     
     predicted_labels = threshold(max_p, tau)
 
-    tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels, predicted_labels).ravel()
-        
+    tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels_correct, predicted_labels).ravel()
+
     specificity_value = specificity(tn, fp)
     sensitivity_value = sensitivity(tp, fn)
     
@@ -267,8 +266,15 @@ def ROC_Selective(Ent, MaxP, Meta_predicted, tau):
     scores['specificity'] = specificity_value
     scores['sensitivity'] = sensitivity_value
         
-    scores['aupr_ent'] = metrics.average_precision_score(Meta_predicted.numpy(), -Ent.numpy())
-    scores['aupr_maxp'] = metrics.average_precision_score(Meta_predicted.numpy(), MaxP.numpy())
+    scores['ap_success'] = metrics.average_precision_score(misclf_labels_correct, max_p)
+    scores['ap_error'] = metrics.average_precision_score(misclf_labels_error, -max_p)
+
+    scores['aupr_success'] = aupr(misclf_labels_correct, max_p)
+    scores['aupr_error'] = aupr(misclf_labels_error, -max_p)
+    
+
+    
+    # scores['ap_success'] = metrics.average_precision_score(Meta_predicted.numpy(), MaxP.numpy())
     
     return scores
 

@@ -2,6 +2,8 @@ import torch
 
 import numpy as np
 
+from sklearn import metrics
+
 # Note: meta model output is: g(\Phi(x); w_{g}) = log(\alpha(x))
 # \implies log(q(y = c | \Phi(x); w_{g})) = log(\alpha_{c}(x)) - log(\alpha_{0})
 # = log(\alpha_{c}(x)) - log(\sum_{i=1}^{k} \alpha_{i}(x))
@@ -81,6 +83,10 @@ def sensitivity(tp, fn):
 # Also known as selectivity, or true negative rate (TNR)
 def specificity(tn, fp):
     return tn / (tn + fp)
+
+def aupr(labels, scores):
+    precision, recall, _  = metrics.precision_recall_curve(labels, scores)
+    return metrics.auc(recall, precision)
 
 # beta > 1 gives more weight to specificity, while beta < 1 favors
 # sensitivity. For example, beta = 2 makes specificity twice as important as

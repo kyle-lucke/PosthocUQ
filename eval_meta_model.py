@@ -94,8 +94,8 @@ if args.dataset == 'CIFAR10':
 
     _, transform_test = get_preprocessor(args.dataset)
 
-    dataset = datasets.SVHN(root='~/data/SVHN', split='train', download=True,
-                            transform=transform_test)
+    dataset = datasets.CIFAR10(root='~/data/CIFAR10', train=True, download=True,
+                               transform=transform_test)
 
     val_idxs = np.load('trained-base-models/cifar10-resnet32/val_idxs.npy')
 
@@ -240,7 +240,8 @@ def get_uncertainty_score(loader, label, get_preds=False):
     maxps = []
     precs = []
 
-    misclf_labels_all = []
+    misclf_labels_correct_all = []
+    misclf_labels_error_all = []
     
     base_preds = []
     preds = []
@@ -287,46 +288,58 @@ def get_uncertainty_score(loader, label, get_preds=False):
             precs.append(compute_precision(logits).data.cpu())
 
             misclf_labels_correct_all.append(misclf_labels_correct)
-            misclf_label_error_all.append(misclf_labels_errors)
+            misclf_labels_error_all.append(misclf_labels_errors)
             
         if get_preds:
             base_preds = torch.cat(base_preds, 0)
             preds = torch.cat(preds, 0)
 
-        return torch.cat(diff_ents, 0), \
-               torch.cat(mis, 0), \
-               torch.cat(ents, 0), \
-               torch.cat(maxps, 0), \
-               torch.cat(precs, 0), \
-               torch.cat(labels, 0), \
-               torch.cat(base_ents, 0), torch.cat(base_maxps, 0), torch.cat(base_energy, 0), \
-               base_preds, preds
-
+        return dict(diff_ents=torch.cat(diff_ents, 0),
+                    mis=torch.cat(mis, 0), 
+                    ents=torch.cat(ents, 0), 
+                    max_ps=torch.cat(maxps, 0), 
+                    precs=torch.cat(precs, 0), 
+                    labels=torch.cat(labels, 0), 
+                    base_ents=torch.cat(base_ents, 0),
+                    base_maxps=torch.cat(base_maxps, 0),
+                    base_energy=torch.cat(base_energy, 0), 
+                    base_preds=base_preds,
+                    meta_preds=preds,
+                    misclf_labels_correct=torch.concat(misclf_labels_correct_all, 0),
+                    misclf_labels_error=torch.concat(misclf_labels_error_all, 0) )
 
 def determine_threshold(max_threshold_step=0.01):
 
     # NOTE: the actual threhsold step may be slightly lower than
     # max_threshold_step due to roundoff
     
-    _, _, _, max_p, _, _, _, _, _, _, meta_preds = get_uncertainty_score(valloader,
-                                                                         label=0, get_preds=True)
+    # _, _, _, max_p, _, _, _, _, _, _, meta_preds = get_uncertainty_score(valloader,
+    #                                                                      label=0, get_preds=True)
 
-    misclf_labels = meta_preds.int().detach().cpu().numpy()
-    max_p = max_p.detach().cpu().numpy()
+    res = get_uncertainty_score(valloader, label=0, get_preds=True)
+
+    max_ps = res['max_ps']
+    misclf_labels_correct = res['misclf_labels_correct']
+    
+    # FIXME:
+    misclf_labels_correct = misclf_labels_correct.int().detach().cpu().numpy()
+    
+    max_ps = max_ps.detach().cpu().numpy()
 
     # determine how many elements we need for a pre-determined spacing
     # between thresholds. taken from:
     # https://stackoverflow.com/a/70230433
-    num = round((max_p.max() - max_p.min()) / max_threshold_step) + 1 
-    thresholds = np.linspace(max_p.min(), max_p.max(), num, endpoint=True)
+    num = round((max_ps.max() - max_ps.min()) / max_threshold_step) + 1 
+    thresholds = np.linspace(max_ps.min(), max_ps.max(), num, endpoint=True)
 
     # compute performance over thresholds
     threshold_to_metric = {}
     for tau in thresholds:
 
-        predicted_labels = threshold(max_p, tau)
+        predicted_labels = threshold(max_ps, tau)
 
-        tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels, predicted_labels).ravel()
+        tn, fp, fn, tp = metrics.confusion_matrix(misclf_labels_correct,
+                                                  predicted_labels).ravel()
         
         specificity_value = specificity(tn, fp)
         sensitivity_value = sensitivity(tp, fn)
@@ -356,8 +369,11 @@ threshold = determine_threshold()
 print(f'selected threshold: {threshold}')
 print()
 
-diff_ents, mis, ents, maxps, precs, labels, base_ents, base_maxps, base_energy, base_preds, meta_preds = \
-    get_uncertainty_score(testloader, label=0, get_preds=True)
+# diff_ents, mis, ents, maxps, precs, labels, base_ents, base_maxps, base_energy, base_preds, meta_preds = \
+#     get_uncertainty_score(testloader, label=0, get_preds=True)
+
+res = get_uncertainty_score(testloader, label=0, get_preds=True)
+
 
 # setup results directory
 out_dir = os.path.join('results', f'eval_{args.name}_{args.meta_model}_{args.seed}')
@@ -368,12 +384,13 @@ if not os.path.exists(out_dir):
 if args.name in ['CIFAR10_miss', 'CIFAR100_miss', 'MNIST_miss', 'SVHN_miss']:
     
     # Evaluate misclassification performance (for test dataset)
-    res = ROC_Selective(ents, maxps, meta_preds, threshold)
+    res = ROC_Selective(res['max_ps'], res['misclf_labels_correct'],
+                        res['misclf_labels_error'], threshold)
     
     for k, v in res.items():
         print(f'{k}: {v:.4f}')
     
-    # save results:
+    # # save results:
     json.dump(res, open(os.path.join(out_dir, 'test_metrics.json'), 'w'))
         
 # elif args.name in ['CIFAR10_OOD', 'CIFAR100_OOD', 'MNIST_OOD']:
